@@ -18,12 +18,23 @@ Open `budget.html` in any modern browser. That's it.
 
 ### Bringing in your own data
 
-This repo ships with **no personal financial data** — all months start blank. To load your own numbers:
+This repo ships with **no personal financial data** — all months start blank. There are three ways to get numbers in:
 
-1. Open the app and fill in a month, or
-2. Use the **Export** button to save a JSON snapshot of your data, and the **Load** button to import a previously exported JSON file back in (useful for moving data between browsers/devices, or restoring a backup).
+1. **Type them in** directly.
+2. **Load an Excel sheet** — the "Load shared expenses" button on the Shared card opens a file picker and reads an `.xlsx` right in the browser. Nothing is uploaded; the file is unzipped and parsed locally using native browser APIs (`DecompressionStream`, `TextDecoder`) with no libraries.
+3. **Export / Load JSON** — the Export button saves a snapshot of every month; Load restores it. Useful for backups or moving between browsers.
 
-There are also two spots in the source (`SHARED_EXPENSE_DATA` and `SHARED_SHEET` in `budget.html`) where you can hardcode your own recurring shared-expense figures if you want a one-click "Load shared expenses" shortcut — they're empty objects by default.
+#### Expected spreadsheet layout
+
+- One worksheet per year, named for the year (`2026`, `2025`, …).
+- A header row with month names (`January` … `December`) across the columns.
+- Below it, one row per expense: the name in column A, the amount in that month's column.
+- The block ends at a row labelled `Total`.
+- Rows whose name contains `*` are treated as **sub-items of a credit-card balance** that is already listed separately, so they are skipped to avoid double-counting. Rows starting with `Owed to` are also skipped.
+
+#### Split rules
+
+Each shared line has a percentage and an optional fixed "extra" that you always pay on top: your share is `(amount − extra) × % + extra`. Whatever you set for a given expense name is remembered (in `localStorage`) and reapplied automatically on future imports, so you only configure each line once.
 
 ## Notes
 

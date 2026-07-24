@@ -438,7 +438,8 @@ function shellHTML(){
   +   '</div>'
   +   '</div>'
   + '</div>'
-  + '<input type="file" id="fileInput" accept="application/json,.json" style="display:none">';
+  + '<input type="file" id="fileInput" accept="application/json,.json" style="display:none">'
+  + '<input type="file" id="xlsxInput" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none">';
 }
 function cardShell(cat){
   var m = (cat==="income") ? { label:"Income", hint:"Paychecks land in Short Term Savings", color:"#1F7A5C", soft:"#E4F0EA", icon:"sparkle" } : CAT[cat];
@@ -613,6 +614,198 @@ function renderCharts(t){
   $("#barWrap").innerHTML = barSVG(t.available, segs);
 }
 
+/* ============================================================
+   Minimal in-browser .xlsx reader
+   Uses only native browser APIs (DecompressionStream, TextDecoder).
+   No libraries, no uploads — the file never leaves the machine.
+   ============================================================ */
+
+/* --- ZIP: locate End Of Central Directory, walk central directory --- */
+function zipEntries(buf){
+  var dv = new DataView(buf), u8 = new Uint8Array(buf);
+  /* find EOCD signature 0x06054b50 scanning backwards */
+  var eocd = -1;
+  for(var i = u8.length - 22; i >= 0 && i > u8.length - 22 - 65558; i--){
+    if(dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
+  }
+  if(eocd < 0) throw new Error("Not a valid .xlsx file (no ZIP end record).");
+  var count = dv.getUint16(eocd + 10, true);
+  var cdOffset = dv.getUint32(eocd + 16, true);
+  var entries = {}, p = cdOffset;
+  for(var n = 0; n < count; n++){
+    if(dv.getUint32(p, true) !== 0x02014b50) break;
+    var method   = dv.getUint16(p + 10, true);
+    var compSize = dv.getUint32(p + 20, true);
+    var nameLen  = dv.getUint16(p + 28, true);
+    var extraLen = dv.getUint16(p + 30, true);
+    var cmtLen   = dv.getUint16(p + 32, true);
+    var localOff = dv.getUint32(p + 42, true);
+    var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nameLen));
+    entries[name] = { method:method, compSize:compSize, localOff:localOff };
+    p += 46 + nameLen + extraLen + cmtLen;
+  }
+  return entries;
+}
+
+/* Read one entry's bytes. NOTE: the local header's own name/extra lengths
+   must be used — they can differ from the central directory's. */
+async function zipRead(buf, entry){
+  var dv = new DataView(buf), u8 = new Uint8Array(buf);
+  var lo = entry.localOff;
+  if(dv.getUint32(lo, true) !== 0x04034b50) throw new Error("Corrupt ZIP entry.");
+  var nameLen  = dv.getUint16(lo + 26, true);
+  var extraLen = dv.getUint16(lo + 28, true);
+  var start = lo + 30 + nameLen + extraLen;
+  var data = u8.subarray(start, start + entry.compSize);
+  if(entry.method === 0) return new TextDecoder().decode(data);        /* stored */
+  if(entry.method !== 8) throw new Error("Unsupported compression in .xlsx.");
+  var ds = new DecompressionStream("deflate-raw");                      /* raw, not zlib */
+  var stream = new Blob([data]).stream().pipeThrough(ds);
+  return await new Response(stream).text();
+}
+
+/* --- XML helpers --- */
+function xmlDoc(text){
+  return new DOMParser().parseFromString(text, "application/xml");
+}
+function colToIndex(ref){                 /* "AB12" -> 28 (1-based column) */
+  var m = /^([A-Z]+)/.exec(ref); if(!m) return 0;
+  var s = m[1], n = 0;
+  for(var i = 0; i < s.length; i++) n = n * 26 + (s.charCodeAt(i) - 64);
+  return n;
+}
+function rowOf(ref){ var m = /(\d+)$/.exec(ref); return m ? parseInt(m[1], 10) : 0; }
+
+/* --- read a whole sheet into rows[rowNum][colNum] = value --- */
+async function readSheetGrid(buf, entries, sheetName){
+  var wbXml   = xmlDoc(await zipRead(buf, entries["xl/workbook.xml"]));
+  var relsXml = xmlDoc(await zipRead(buf, entries["xl/_rels/workbook.xml.rels"]));
+
+  var relTarget = {};
+  var rels = relsXml.getElementsByTagName("Relationship");
+  for(var i = 0; i < rels.length; i++){
+    relTarget[rels[i].getAttribute("Id")] = rels[i].getAttribute("Target");
+  }
+
+  var target = null, names = [];
+  var sheets = wbXml.getElementsByTagName("sheet");
+  for(var j = 0; j < sheets.length; j++){
+    var nm = sheets[j].getAttribute("name");
+    names.push(nm);
+    if(nm === sheetName){
+      var rid = sheets[j].getAttribute("r:id") || sheets[j].getAttribute("id");
+      target = relTarget[rid];
+    }
+  }
+  if(!target) return { grid:null, sheetNames:names };
+
+  var path = target.indexOf("/") === 0 ? target.slice(1)
+           : (target.indexOf("xl/") === 0 ? target : "xl/" + target);
+  if(!entries[path]) return { grid:null, sheetNames:names };
+
+  /* shared strings table (cells with t="s" hold an index into this) */
+  var shared = [];
+  if(entries["xl/sharedStrings.xml"]){
+    var ssXml = xmlDoc(await zipRead(buf, entries["xl/sharedStrings.xml"]));
+    var sis = ssXml.getElementsByTagName("si");
+    for(var k = 0; k < sis.length; k++){
+      var ts = sis[k].getElementsByTagName("t"), s = "";
+      for(var t = 0; t < ts.length; t++) s += ts[t].textContent;
+      shared.push(s);
+    }
+  }
+
+  var shXml = xmlDoc(await zipRead(buf, entries[path]));
+  var cells = shXml.getElementsByTagName("c");
+  var grid = {};
+  for(var c = 0; c < cells.length; c++){
+    var cell = cells[c], ref = cell.getAttribute("r");
+    if(!ref) continue;
+    var type = cell.getAttribute("t");
+    var val;
+    if(type === "inlineStr"){
+      var isNode = cell.getElementsByTagName("t");
+      val = isNode.length ? isNode[0].textContent : "";
+    } else {
+      var vNode = cell.getElementsByTagName("v");
+      if(!vNode.length) continue;
+      var raw = vNode[0].textContent;
+      if(type === "s")      val = shared[parseInt(raw, 10)];
+      else if(type === "e") continue;                 /* error cell — skip */
+      else if(type === "str") val = raw;
+      else                  val = parseFloat(raw);
+    }
+    var r = rowOf(ref), ci = colToIndex(ref);
+    if(!grid[r]) grid[r] = {};
+    grid[r][ci] = val;
+  }
+  return { grid:grid, sheetNames:names };
+}
+
+/* --- interpret the grid as {expenseName: amount} for a given month --- */
+var MONTH_NAMES = ["january","february","march","april","may","june",
+                   "july","august","september","october","november","december"];
+
+function extractMonth(grid, monthIndex /* 0-11 */){
+  /* 1. find the header row that contains month names, and which column holds our month */
+  var headerRow = null, monthCol = null;
+  var rowNums = Object.keys(grid).map(Number).sort(function(a,b){ return a-b; });
+  for(var i = 0; i < rowNums.length; i++){
+    var row = grid[rowNums[i]], hits = 0, foundCol = null;
+    for(var col in row){
+      var v = row[col];
+      if(typeof v === "string"){
+        var idx = MONTH_NAMES.indexOf(v.trim().toLowerCase());
+        if(idx >= 0){ hits++; if(idx === monthIndex) foundCol = Number(col); }
+      }
+    }
+    if(hits >= 6){ headerRow = rowNums[i]; monthCol = foundCol; break; }
+  }
+  if(headerRow === null) throw new Error("Could not find a month header row in that sheet.");
+  if(monthCol === null)  throw new Error("That sheet has no column for the selected month.");
+
+  /* 2. walk rows below the header, reading label (col A) + amount (month col),
+        stopping at the Total row. Rows whose label ends in '*' are components
+        of a card balance already counted elsewhere, so they're skipped. */
+  var out = {}, skipped = [];
+  for(var j = 0; j < rowNums.length; j++){
+    var rn = rowNums[j];
+    if(rn <= headerRow) continue;
+    var row = grid[rn];
+    var label = row[1];
+    if(typeof label !== "string" || !label.trim()) continue;
+    label = label.trim();
+
+    var lower = label.toLowerCase();
+    if(lower === "total" || lower.indexOf("total ") === 0) break;   /* end of the block */
+
+    if(/\*\s*$/.test(label) || label.indexOf("*") >= 0){ skipped.push(label); continue; }
+    if(lower.indexOf("owed to") === 0) continue;
+
+    var amt = row[monthCol];
+    if(typeof amt !== "number" || !isFinite(amt) || amt === 0) continue;
+    out[label] = Math.round(amt * 100) / 100;
+  }
+  return { data:out, skipped:skipped };
+}
+
+/* --- top-level: File -> {expenseName: amount} for monthKey "YYYY-MM" --- */
+async function readSharedExpensesFromXlsx(file, monthKey){
+  var buf = await file.arrayBuffer();
+  var entries = zipEntries(buf);
+  if(!entries["xl/workbook.xml"]) throw new Error("That file doesn't look like an Excel workbook.");
+
+  var parts = monthKey.split("-");
+  var year = parts[0], monthIndex = parseInt(parts[1], 10) - 1;
+
+  var res = await readSheetGrid(buf, entries, year);
+  if(!res.grid){
+    throw new Error("No sheet named “" + year + "” in that workbook. Sheets found: "
+                    + res.sheetNames.join(", "));
+  }
+  return extractMonth(res.grid, monthIndex);
+}
+
 /* ----------------------------- actions --------------------------- */
 var saveTimer = null;
 function setStatus(s){ var e = $("#saveStatus"); if(e) e.textContent = s; }
@@ -634,28 +827,68 @@ function navMonth(delta){
 }
 var RESET_AMOUNT = { income:true, variable:true, shared:true };
 
-function importSharedExpenses(){
-  var d = SHARED_EXPENSE_DATA[state.monthKey];
-  if(!d){ alert('No Shared Account data found for ' + monthLabel(state.monthKey) + '.'); return; }
-  var acct = (state.data.shared[0] && state.data.shared[0].account) || DEFAULT_ACCT.shared;
-  /* build a line for each expense in the dataset; preserve existing sharePct/extra for matching lines */
-  var existing = {};
-  state.data.shared.forEach(function(i){ existing[i.name] = i; });
-  var lines = Object.keys(d).map(function(name){
-    var prev = existing[name];
-    var isAtt = ATT_NAMES.indexOf(name) >= 0;
-    return {
-      id: uid(),
-      name: name,
-      amount: String(d[name]),
-      sharePct: prev ? prev.sharePct : "50",
-      extra: isAtt ? String(ATT_EXTRA) : (prev ? (prev.extra || "") : ""),
-      account: acct
-    };
-  });
-  state.data.shared = lines;
-  saveNow(); renderLines(); updateDerived();
+/* Split rules are remembered per expense name, so an import never has to
+   re-learn them. Nothing personal is hardcoded — the app stores what you set. */
+function loadSplits(){
+  try { return JSON.parse(lsGet("budget:splits") || "{}"); } catch(e){ return {}; }
 }
+function saveSplit(name, pct, extra){
+  if(!name) return;
+  var m = loadSplits();
+  m[name] = { pct:String(pct == null ? "50" : pct), extra:String(extra || "") };
+  lsSet("budget:splits", JSON.stringify(m));
+}
+function splitSettingsFor(name){
+  var here = state.data.shared || [];
+  for(var i = 0; i < here.length; i++){
+    if(here[i].name === name) return { pct:here[i].sharePct, extra:here[i].extra || "" };
+  }
+  var saved = loadSplits()[name];
+  if(saved) return { pct:saved.pct, extra:saved.extra };
+  var prev = loadMonthRaw(shiftMonth(state.monthKey, -1));
+  if(prev && prev.shared){
+    for(var j = 0; j < prev.shared.length; j++){
+      if(prev.shared[j].name === name){
+        return { pct:prev.shared[j].sharePct, extra:prev.shared[j].extra || "" };
+      }
+    }
+  }
+  if(name.indexOf("AT&T") === 0) return { pct:"50", extra:String(ATT_EXTRA) };
+  return { pct:"50", extra:"" };
+}
+
+function importSharedExpenses(){
+  $("#xlsxInput").click();          /* pick the spreadsheet; parsed locally */
+}
+
+async function loadSharedFromFile(file){
+  setStatus("Reading spreadsheet\u2026");
+  var res;
+  try {
+    res = await readSharedExpensesFromXlsx(file, state.monthKey);
+  } catch(err){
+    setStatus("All changes saved");
+    alert("Couldn't read that spreadsheet.\n\n" + err.message);
+    return;
+  }
+  var names = Object.keys(res.data);
+  if(!names.length){
+    setStatus("All changes saved");
+    alert("No expense amounts found for " + monthLabel(state.monthKey) + " in that spreadsheet.");
+    return;
+  }
+  var acct = (state.data.shared[0] && state.data.shared[0].account) || DEFAULT_ACCT.shared;
+  state.data.shared = names.map(function(name){
+    var sp = splitSettingsFor(name);
+    return { id:uid(), name:name, amount:String(res.data[name]),
+             sharePct:sp.pct, extra:sp.extra, account:acct };
+  });
+  saveNow(); renderLines(); updateDerived();
+  var msg = "Loaded " + names.length + " shared expenses for " + monthLabel(state.monthKey);
+  if(res.skipped && res.skipped.length) msg += " (" + res.skipped.length + " card sub-items rolled up)";
+  setStatus(msg);
+}
+
 function copyCard(cat){
   var pd = loadMonthRaw(shiftMonth(state.monthKey, -1));
   if(!pd || !pd[cat] || !pd[cat].length) return;
@@ -717,6 +950,9 @@ function wireEvents(){
       } else if(field==="sharePct" || field==="extra"){ v = v.replace(/[^0-9.]/g,""); }
       if(v !== el.value) el.value = v;
       var item = findItem(cat, id); if(item) item[field] = v;
+      if(cat==="shared" && item && (field==="sharePct" || field==="extra")){
+        saveSplit(item.name, item.sharePct, item.extra);
+      }
       scheduleSave(); updateDerived();
     } else if(el.dataset && el.dataset.acct !== undefined){
       var v2 = el.value.replace(/[^0-9.]/g,""); if(v2 !== el.value) el.value = v2;
@@ -755,6 +991,11 @@ function wireEvents(){
     else if(a==="importshared"){ importSharedSheet(); }
     else if(a==="export"){ exportData(); }
     else if(a==="import"){ $("#fileInput").click(); }
+  });
+  $("#xlsxInput").addEventListener("change", function(e){
+    var f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if(f) loadSharedFromFile(f);
   });
   $("#fileInput").addEventListener("change", function(e){
     var f = e.target.files && e.target.files[0]; if(!f) return;
