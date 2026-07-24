@@ -750,6 +750,7 @@ function wireEvents(){
     else if(a==="del"){ var cat=b.dataset.cat, id=b.dataset.id; state.data[cat] = state.data[cat].filter(function(x){ return x.id!==id; }); saveNow(); renderLines(); updateDerived(); }
     else if(a==="prev"){ navMonth(-1); }
     else if(a==="next"){ navMonth(1); }
+    else if(a==="copycard"){ copyCard(b.dataset.cat); }
     else if(a==="loadshared"){ importSharedExpenses(); }
     else if(a==="importshared"){ importSharedSheet(); }
     else if(a==="export"){ exportData(); }
