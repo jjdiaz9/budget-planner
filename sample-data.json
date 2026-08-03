@@ -1,0 +1,255 @@
+{
+  "app": "monthly-budget",
+  "version": 1,
+  "exportedAt": "2026-01-15T12:00:00.000Z",
+  "currency": "USD",
+  "months": {
+    "2026-01": {
+      "income": [
+        {
+          "id": "sample-001",
+          "name": "Paycheck 1",
+          "amount": "2400"
+        },
+        {
+          "id": "sample-002",
+          "name": "Paycheck 2",
+          "amount": "2400"
+        }
+      ],
+      "fixed": [
+        {
+          "id": "sample-003",
+          "name": "Student loan",
+          "amount": "320",
+          "account": "Fixed Checking"
+        },
+        {
+          "id": "sample-004",
+          "name": "Renters insurance",
+          "amount": "18",
+          "account": "Fixed Checking"
+        },
+        {
+          "id": "sample-005",
+          "name": "Gym",
+          "amount": "42",
+          "account": "Fixed Checking"
+        }
+      ],
+      "variable": [
+        {
+          "id": "sample-006",
+          "name": "Spending money",
+          "amount": "600",
+          "account": "Rewards Checking"
+        },
+        {
+          "id": "sample-007",
+          "name": "Fuel",
+          "amount": "120",
+          "account": "Variable Checking"
+        }
+      ],
+      "shared": [
+        {
+          "id": "sample-008",
+          "name": "Rent",
+          "amount": "2200",
+          "account": "Shared Account",
+          "sharePct": "50"
+        },
+        {
+          "id": "sample-009",
+          "name": "Electric",
+          "amount": "88",
+          "account": "Shared Account",
+          "sharePct": "50"
+        },
+        {
+          "id": "sample-010",
+          "name": "Phone plan",
+          "amount": "130",
+          "account": "Shared Account",
+          "sharePct": "50",
+          "extra": "15"
+        },
+        {
+          "id": "sample-011",
+          "name": "Streaming bundle",
+          "amount": "32.5",
+          "account": "Shared Account",
+          "sharePct": "50"
+        },
+        {
+          "id": "sample-012",
+          "name": "Groceries",
+          "amount": "700",
+          "account": "Shared Account",
+          "sharePct": "50"
+        },
+        {
+          "id": "sample-013",
+          "name": "Car insurance (yours)",
+          "amount": "540",
+          "account": "Shared Account",
+          "sharePct": "100"
+        },
+        {
+          "id": "sample-014",
+          "name": "Car insurance (theirs)",
+          "amount": "610",
+          "account": "Shared Account",
+          "sharePct": "0"
+        }
+      ],
+      "savings": [
+        {
+          "id": "sample-015",
+          "name": "Emergency fund",
+          "amount": "400",
+          "account": "Long Term Savings"
+        },
+        {
+          "id": "sample-016",
+          "name": "Travel",
+          "amount": "150",
+          "account": "Short Term Savings"
+        },
+        {
+          "id": "sample-017",
+          "name": "New laptop",
+          "amount": "75",
+          "account": "Short Term Savings"
+        }
+      ],
+      "rollover": {
+        "Fixed Checking": "60",
+        "Variable Checking": "45.20",
+        "Rewards Checking": "110"
+      }
+    },
+    "2026-02": {
+      "income": [
+        {
+          "id": "sample-018",
+          "name": "Paycheck 1",
+          "amount": "2400"
+        },
+        {
+          "id": "sample-019",
+          "name": "Paycheck 2",
+          "amount": "2400"
+        },
+        {
+          "id": "sample-020",
+          "name": "Tax refund",
+          "amount": "815"
+        }
+      ],
+      "fixed": [
+        {
+          "id": "sample-021",
+          "name": "Student loan",
+          "amount": "320",
+          "account": "Fixed Checking"
+        },
+        {
+          "id": "sample-022",
+          "name": "Renters insurance",
+          "amount": "18",
+          "account": "Fixed Checking"
+        },
+        {
+          "id": "sample-023",
+          "name": "Gym",
+          "amount": "42",
+          "account": "Fixed Checking"
+        }
+      ],
+      "variable": [
+        {
+          "id": "sample-024",
+          "name": "Spending money",
+          "amount": "600",
+          "account": "Rewards Checking"
+        },
+        {
+          "id": "sample-025",
+          "name": "Fuel",
+          "amount": "95",
+          "account": "Variable Checking"
+        },
+        {
+          "id": "sample-026",
+          "name": "Vet visit",
+          "amount": "210",
+          "account": "Variable Checking"
+        }
+      ],
+      "shared": [
+        {
+          "id": "sample-027",
+          "name": "Rent",
+          "amount": "2200",
+          "account": "Shared Account",
+          "sharePct": "50"
+        },
+        {
+          "id": "sample-028",
+          "name": "Electric",
+          "amount": "143",
+          "account": "Shared Account",
+          "sharePct": "50"
+        },
+        {
+          "id": "sample-029",
+          "name": "Phone plan",
+          "amount": "130",
+          "account": "Shared Account",
+          "sharePct": "50",
+          "extra": "15"
+        },
+        {
+          "id": "sample-030",
+          "name": "Streaming bundle",
+          "amount": "32.5",
+          "account": "Shared Account",
+          "sharePct": "50"
+        },
+        {
+          "id": "sample-031",
+          "name": "Groceries",
+          "amount": "760",
+          "account": "Shared Account",
+          "sharePct": "50"
+        }
+      ],
+      "savings": [
+        {
+          "id": "sample-032",
+          "name": "Emergency fund",
+          "amount": "400",
+          "account": "Long Term Savings"
+        },
+        {
+          "id": "sample-033",
+          "name": "Travel",
+          "amount": "150",
+          "account": "Short Term Savings"
+        },
+        {
+          "id": "sample-034",
+          "name": "New laptop",
+          "amount": "-225",
+          "account": "Short Term Savings"
+        }
+      ],
+      "rollover": {
+        "Fixed Checking": "60",
+        "Variable Checking": "38.10",
+        "Rewards Checking": "95"
+      }
+    }
+  }
+}

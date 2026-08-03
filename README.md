@@ -14,7 +14,11 @@ A single-file, offline, dependency-free monthly budgeting app. Everything runs c
 
 ## Using it
 
-Open `budget.html` in any modern browser. That's it.
+Open `budget.html` in any modern browser, or visit the hosted copy. That's it.
+
+### Trying it without your own data
+
+`sample-data.json` holds two months of **made-up** figures. Click **Load**, pick that file, and the app fills in — useful for seeing how shared splits, rollover and the transfer plan behave before entering anything real.
 
 ### Bringing in your own data
 
@@ -39,3 +43,4 @@ Each shared line has a percentage and an optional fixed "extra" that you always 
 ## Notes
 
 - All data stays in `localStorage` in your browser; clearing site data will clear the budget.
+- `.gitignore` denies `*.json`, `*.xlsx` and `*.csv` by default, allowing only `sample-data.json`. Your own spreadsheet or exports can sit in this folder without risk of being committed.

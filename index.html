@@ -233,27 +233,6 @@ function it(name, amount, account, sharePct, extra){
 var SEED_BUILDERS = {};
 var SEED_VERSION = 3;
 
-/* monthly shared-expense bill amounts — populate by importing your own spreadsheet/export */
-var SHARED_SHEET = {};
-/* split rule per shared line: 50/50 by default; AT&T adds one person's fixed $10.67; each GEICO is that person's own */
-function sharedSplitFor(name){
-  if(name.indexOf("AT&T")===0) return { pct:"50", extra:"10.67" };
-  if(name.indexOf("GEICO Person A")===0) return { pct:"0", extra:"" };
-  if(name.indexOf("GEICO Person B")===0) return { pct:"100", extra:"" };
-  return { pct:"50", extra:"" };
-}
-function importSharedSheet(){
-  var rows = SHARED_SHEET[state.monthKey];
-  if(!rows || !rows.length) return;
-  var acct = (state.data.shared[0] && state.data.shared[0].account) || DEFAULT_ACCT.shared;
-  state.data.shared = rows.map(function(r){
-    var sp = sharedSplitFor(r[0]);
-    return { id:uid(), name:r[0], amount:String(r[1]), sharePct:sp.pct, extra:sp.extra, account:acct };
-  });
-  saveNow(); renderLines(); updateDerived();
-  setStatus("Shared amounts imported");
-}
-
 function isEmptyMonth(d){
   var cats = ["income","fixed","variable","shared","savings"];
   var anyAmt = cats.some(function(c){ return (d[c]||[]).some(function(i){ return num(i.amount) !== 0; }); });
@@ -499,9 +478,6 @@ function renderLines(){
 
   var sharedSel = $("#sharedAcctSel");
   if(sharedSel){ sharedSel.value = (state.data.shared[0] && state.data.shared[0].account) || DEFAULT_ACCT.shared; }
-  var impBtn = $("#sharedImportBtn");
-  if(impBtn){ impBtn.style.display = (SHARED_SHEET[state.monthKey] && SHARED_SHEET[state.monthKey].length) ? "" : "none"; }
-
   var pd = loadMonthRaw(shiftMonth(state.monthKey, -1));
   var pm = pd ? monthLabel(shiftMonth(state.monthKey,-1)) : "";
   ["income","fixed","variable","shared","savings"].forEach(function(cat){
@@ -988,7 +964,6 @@ function wireEvents(){
     else if(a==="next"){ navMonth(1); }
     else if(a==="copycard"){ copyCard(b.dataset.cat); }
     else if(a==="loadshared"){ importSharedExpenses(); }
-    else if(a==="importshared"){ importSharedSheet(); }
     else if(a==="export"){ exportData(); }
     else if(a==="import"){ $("#fileInput").click(); }
   });
