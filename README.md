@@ -27,6 +27,21 @@ This repo ships with **no personal financial data** — all months start blank. 
 1. **Type them in** directly.
 2. **Load an Excel sheet** — the "Load shared expenses" button on the Shared card opens a file picker and reads an `.xlsx` right in the browser. Nothing is uploaded; the file is unzipped and parsed locally using native browser APIs (`DecompressionStream`, `TextDecoder`) with no libraries.
 3. **Export / Load JSON** — the Export button saves a snapshot of every month; Load restores it. Useful for backups or moving between browsers.
+4. **Sync with a private repo** — see below.
+
+### Syncing across machines
+
+**Sync…** stores your budget as a single JSON file in a private GitHub repository. **Push** sends this browser's copy up, **Pull** brings the other machine's copy down.
+
+Settings: repository owner, name, file path and branch, plus a fine-grained access token scoped to that one repository with **Contents: Read and write**.
+
+Three things are kept in separate browser storage keys and never mixed: the budget data (the only thing that travels), the repo configuration, and the token. An exported or synced file therefore cannot carry a credential, and a leaked data file reveals nothing about where it came from.
+
+**Conflicts are never resolved silently.** If both machines changed since they last matched, the write is blocked and you're shown both copies — device, timestamp and a summary of contents. Whichever you discard is downloaded as a backup first. There is no last-write-wins.
+
+Auto-push is available but **off by default**: each push is a commit, and enabling it turns the repo history into noise.
+
+> **A note on tokens and GitHub Pages.** All `username.github.io` project sites share a single browser origin, because same-origin policy keys on host rather than path. A token stored while using the hosted copy is readable by any other Pages site published under the same account. The app warns about this on-screen. If that matters to you, open a local copy of `budget.html` when syncing.
 
 #### Expected spreadsheet layout
 

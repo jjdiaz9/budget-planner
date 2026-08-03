@@ -121,6 +121,26 @@ html,body{margin:0;background:#EFEAE0;font-family:'Inter',system-ui,sans-serif;c
 .bgt-legend b{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums;}
 .bgt-dot{width:9px;height:9px;border-radius:3px;flex-shrink:0;}
 
+.bgt-modal{position:fixed;inset:0;background:rgba(22,36,59,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:50;}
+.bgt-modalbox{background:var(--card);border-radius:14px;padding:20px;max-width:560px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(22,36,59,.3);}
+.bgt-modalbox h3{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:17px;margin:0 0 4px;}
+.bgt-modalfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+.bgt-field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;}
+.bgt-field label{font-size:12px;color:var(--soft);font-weight:500;}
+.bgt-field input[type=text],.bgt-field input[type=password]{font-family:'IBM Plex Mono',monospace;font-size:13px;border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:var(--paper);color:var(--ink);outline:none;width:100%;}
+.bgt-field input:focus{border-color:var(--ink);background:#fff;}
+.bgt-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.bgt-check{display:flex;align-items:center;gap:8px;font-size:13px;margin:6px 0 2px;}
+.bgt-warn{display:flex;gap:8px;background:#FBF0E4;border:1px solid #E8D3B0;color:#8A5A12;border-radius:9px;padding:10px 12px;font-size:12.5px;line-height:1.45;margin-bottom:12px;}
+.bgt-syncstate{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--soft);margin-top:10px;}
+.bgt-cflist{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px;}
+.bgt-cfcard{border:1px solid var(--line);border-radius:11px;padding:13px;display:flex;flex-direction:column;gap:3px;}
+.bgt-cfcard h4{font-family:'Space Grotesk',sans-serif;font-size:14px;margin:0 0 4px;}
+.bgt-cfmeta{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--soft);}
+.bgt-cfsum{font-size:12.5px;margin:7px 0 10px;}
+.bgt-cfcard .bgt-btn{width:100%;margin-top:auto;}
+@media (max-width:620px){ .bgt-cflist,.bgt-row2{grid-template-columns:1fr;} }
+
 @media (max-width:820px){
   .bgt{padding:14px;margin:0;border-radius:0;}
   .bgt-grid{grid-template-columns:1fr;}
@@ -391,7 +411,7 @@ function shellHTML(){
   +   '<div class="bgt-brand"><span class="bgt-logo">'+ic("wallet")+'</span><div><div class="bgt-kicker">Monthly plan</div><h1 class="bgt-h1">Budget &amp; Transfers</h1></div></div>'
   +   '<div class="bgt-controls">'
   +     '<span class="bgt-save" id="saveStatus">All changes saved</span>'
-  +     '<div class="bgt-toolbar"><button class="bgt-btn" data-action="export">Export</button><button class="bgt-btn" data-action="import">Load</button></div>'
+  +     '<div class="bgt-toolbar"><button class="bgt-btn" data-action="sync-pull" title="Fetch the copy in your private repo">Pull</button><button class="bgt-btn" data-action="sync-push" title="Send this copy to your private repo">Push</button><button class="bgt-btn" data-action="sync-open" title="Sync settings">Sync\u2026</button><button class="bgt-btn" data-action="export">Export</button><button class="bgt-btn" data-action="import">Load</button></div>'
   +     '<select class="bgt-select" id="currencySel">'+CURRENCIES.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join("")+'</select>'
   +     '<div class="bgt-monthnav"><button data-action="prev" aria-label="Previous month">'+ic("chevL")+'</button><span class="bgt-month" id="monthLabel"></span><button data-action="next" aria-label="Next month">'+ic("chevR")+'</button></div>'
   +   '</div>'
@@ -418,7 +438,29 @@ function shellHTML(){
   +   '</div>'
   + '</div>'
   + '<input type="file" id="fileInput" accept="application/json,.json" style="display:none">'
-  + '<input type="file" id="xlsxInput" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none">';
+  + '<input type="file" id="xlsxInput" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none">'
+  + '<div class="bgt-modal" id="syncWrap"><div class="bgt-modalbox">'
+  +   '<h3>Sync with a private repo</h3>'
+  +   '<p class="bgt-ordersub">Your budget is kept as one JSON file in a repository only you can read. The token stays in this browser and is never included in the file.</p>'
+  +   '<div class="bgt-warn" id="syncWarn" style="display:none">' + ic("warn")
+  +     '<span><b>This page shares an origin with your other GitHub Pages sites.</b> Anything published under the same <code>github.io</code> account can read a token stored here. For a token you care about, open the app from a local copy instead.</span></div>'
+  +   '<div class="bgt-row2"><div class="bgt-field"><label>Owner</label><input type="text" id="syncOwner" placeholder="your-username" autocomplete="off"></div>'
+  +     '<div class="bgt-field"><label>Repository</label><input type="text" id="syncRepo" placeholder="private-repo" autocomplete="off"></div></div>'
+  +   '<div class="bgt-row2"><div class="bgt-field"><label>File path</label><input type="text" id="syncPath" placeholder="budget-data.json" autocomplete="off"></div>'
+  +     '<div class="bgt-field"><label>Branch</label><input type="text" id="syncBranch" placeholder="main" autocomplete="off"></div></div>'
+  +   '<div class="bgt-field"><label>Access token &mdash; fine-grained, one repository, Contents: Read and write</label>'
+  +     '<input type="password" id="syncToken" placeholder="github_pat_..." autocomplete="off"></div>'
+  +   '<label class="bgt-check"><input type="checkbox" id="syncAuto"> Push automatically after edits</label>'
+  +   '<p class="bgt-ordernote">Leaving this off is recommended: every push becomes a commit, and turning it on makes the history noisy.</p>'
+  +   '<div class="bgt-syncstate" id="syncState"></div>'
+  +   '<div class="bgt-modalfoot"><button class="bgt-btn" data-action="sync-forget">Forget token</button>'
+  +     '<button class="bgt-btn" data-action="sync-close">Cancel</button>'
+  +     '<button class="bgt-btn" data-action="sync-save">Save</button></div>'
+  + '</div></div>'
+  + '<div class="bgt-modal" id="conflictWrap"><div class="bgt-modalbox">'
+  +   '<h3>Two copies have diverged</h3><div id="conflictBody"></div>'
+  +   '<div class="bgt-modalfoot"><button class="bgt-btn" data-action="cf-cancel">Cancel</button></div>'
+  + '</div></div>';
 }
 function cardShell(cat){
   var m = (cat==="income") ? { label:"Income", hint:"Paychecks land in Short Term Savings", color:"#1F7A5C", soft:"#E4F0EA", icon:"sparkle" } : CAT[cat];
@@ -782,15 +824,356 @@ async function readSharedExpensesFromXlsx(file, monthKey){
   return extractMonth(res.grid, monthIndex);
 }
 
+/* ============================================================
+   Sync: one JSON file in a private GitHub repo.
+   localStorage is the working copy; the file is the exchange medium.
+
+   Three storage keys, deliberately kept apart:
+     budget:m:*     the data itself   (this is what travels)
+     budget:sync    repo config + rev bookkeeping   (never travels)
+     budget:token   the access token  (never travels, never exported)
+   ============================================================ */
+
+var SYNC_KEY = "budget:sync", TOKEN_KEY = "budget:token";
+
+function loadSyncCfg(){
+  var d = { owner:"", repo:"", path:"budget-data.json", branch:"main",
+            rev:0, baseRev:0, modified:"", device:"", auto:false };
+  try {
+    var s = JSON.parse(lsGet(SYNC_KEY) || "{}");
+    for(var k in s) d[k] = s[k];
+  } catch(e){}
+  if(!d.device) d.device = makeDeviceName();
+  return d;
+}
+function saveSyncCfg(c){ lsSet(SYNC_KEY, JSON.stringify(c)); }
+function getToken(){ return lsGet(TOKEN_KEY) || ""; }
+function setToken(t){ if(t) lsSet(TOKEN_KEY, t); else lsDel(TOKEN_KEY); }
+
+function makeDeviceName(){
+  var p = navigator.platform || "Device";
+  var os = /Mac/i.test(p) ? "Mac" : /Win/i.test(p) ? "Windows" : /Linux/i.test(p) ? "Linux"
+         : /iPhone|iPad/i.test(navigator.userAgent||"") ? "iOS" : "Device";
+  return os + " · " + Math.random().toString(36).slice(2,5);
+}
+
+/* every meaningful edit advances the revision */
+function bumpRev(){
+  var c = loadSyncCfg();
+  c.rev = (c.rev || 0) + 1;
+  c.modified = new Date().toISOString();
+  saveSyncCfg(c);
+}
+function hasLocalEdits(){ var c = loadSyncCfg(); return (c.rev || 0) > (c.baseRev || 0); }
+
+/* ---- the payload that travels ---- */
+function buildPayload(){
+  var c = loadSyncCfg();
+  var months = {};
+  allMonthKeys().forEach(function(k){ var d = loadMonthRaw(k); if(d) months[k] = d; });
+  months[state.monthKey] = state.data;
+  return {
+    app:"monthly-budget", version:1,
+    exportedAt:new Date().toISOString(),
+    currency:state.currency,
+    months:months,
+    sync:{ rev:c.rev || 0, modified:c.modified || new Date().toISOString(), device:c.device }
+  };
+}
+function describePayload(p){
+  var months = Object.keys(p.months || {});
+  var filled = months.filter(function(k){
+    var m = p.months[k], cats = ["income","fixed","variable","shared","savings"];
+    return cats.some(function(c){ return (m[c]||[]).some(function(i){ return num(i.amount) !== 0; }); });
+  });
+  var lines = 0;
+  months.forEach(function(k){
+    ["income","fixed","variable","shared","savings"].forEach(function(c){
+      lines += (p.months[k][c] || []).length;
+    });
+  });
+  return months.length + " months, " + filled.length + " with figures, " + lines + " lines";
+}
+
+/* ---- base64 that survives non-ASCII, and GitHub's newline wrapping ---- */
+function b64encode(s){
+  var bin = "", bytes = new TextEncoder().encode(s);
+  for(var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function b64decode(s){
+  var clean = String(s).replace(/\s/g, "");
+  return new TextDecoder().decode(Uint8Array.from(atob(clean), function(c){ return c.charCodeAt(0); }));
+}
+
+/* ---- GitHub Contents API ---- */
+function ghHeaders(){
+  return { "Authorization":"Bearer " + getToken(),
+           "Accept":"application/vnd.github+json",
+           "X-GitHub-Api-Version":"2022-11-28" };
+}
+function ghContentsUrl(c){
+  return "https://api.github.com/repos/" + encodeURIComponent(c.owner) + "/"
+       + encodeURIComponent(c.repo) + "/contents/"
+       + c.path.split("/").map(encodeURIComponent).join("/");
+}
+
+/* Map status codes to something a person can act on. */
+function ghError(status, body){
+  if(status === 401) return "Token rejected — it may be expired, revoked, or mistyped.";
+  if(status === 403){
+    if(/rate limit/i.test(body||"")) return "GitHub rate limit reached. Wait a minute and try again.";
+    return "Token lacks permission. It needs Contents: Read and write on this repository.";
+  }
+  if(status === 409 || status === 422) return "The file changed while writing. Pull the latest copy first.";
+  return "GitHub returned " + status + ". " + (body || "").slice(0, 200);
+}
+
+async function ghRead(c){
+  var url = ghContentsUrl(c) + "?ref=" + encodeURIComponent(c.branch);
+  var res = await fetch(url, { headers:ghHeaders() });
+
+  if(res.status === 404){
+    /* 404 is ambiguous: the file may not exist, or the token may not be able
+       to see the repo at all — private repos are hidden, not forbidden.
+       Probe the repo itself to tell the two apart. */
+    var probe = await fetch("https://api.github.com/repos/" + encodeURIComponent(c.owner)
+                            + "/" + encodeURIComponent(c.repo), { headers:ghHeaders() });
+    if(probe.ok) return { missing:true };
+    if(probe.status === 401) throw new Error(ghError(401));
+    throw new Error("Can't see " + c.owner + "/" + c.repo
+                    + " — check the names, or the token has no access to it.");
+  }
+  if(!res.ok) throw new Error(ghError(res.status, await res.text()));
+
+  var j = await res.json();
+  var payload;
+  try { payload = JSON.parse(b64decode(j.content)); }
+  catch(e){ throw new Error("The file in that repo isn't valid budget JSON."); }
+  return { payload:payload, sha:j.sha };
+}
+
+async function ghWrite(c, payload, sha, message){
+  var body = { message:message || ("budget: update from " + c.device),
+               content:b64encode(JSON.stringify(payload, null, 2)),
+               branch:c.branch };
+  if(sha) body.sha = sha;           /* omitted on create; required on update */
+  var res = await fetch(ghContentsUrl(c), {
+    method:"PUT", headers:ghHeaders(), body:JSON.stringify(body)
+  });
+  if(!res.ok) throw new Error(ghError(res.status, await res.text()));
+  return await res.json();
+}
+
+/* ---- the four-way decision ---- */
+function compareRevs(remoteRev, cfg){
+  var base = cfg.baseRev || 0, local = cfg.rev || 0;
+  var pending = local > base;
+  if(remoteRev > base && pending)  return "conflict";
+  if(remoteRev > base && !pending) return "adopt-remote";
+  if(remoteRev <= base && pending) return "push-needed";
+  return "up-to-date";
+}
+
+function applyPayload(p){
+  allMonthKeys().forEach(function(k){ lsDel("budget:m:"+k); });
+  Object.keys(p.months || {}).forEach(function(k){
+    try { lsSet("budget:m:"+k, JSON.stringify(p.months[k])); } catch(e){}
+  });
+  if(p.currency){ state.currency = p.currency; saveCurrency(state.currency); fmtCache = {}; }
+  var keys = Object.keys(p.months || {});
+  if(keys.indexOf(state.monthKey) < 0 && keys.length){ keys.sort(); state.monthKey = keys[keys.length-1]; }
+  state.data = getMonth(state.monthKey);
+  var sel = $("#currencySel"); if(sel) sel.value = state.currency;
+  var lbl = $("#monthLabel"); if(lbl) lbl.textContent = monthLabel(state.monthKey);
+  renderLines(); updateDerived();
+}
+
+function requireConfig(){
+  var c = loadSyncCfg();
+  if(!c.owner || !c.repo || !c.path){ openSyncPanel(); setStatus("Set the repo first"); return null; }
+  if(!getToken()){ openSyncPanel(); setStatus("Add a token first"); return null; }
+  return c;
+}
+
+/* ---- pull ---- */
+async function syncPull(force){
+  var c = requireConfig(); if(!c) return;
+  setStatus("Checking…");
+  var r;
+  try { r = await ghRead(c); }
+  catch(e){ setStatus("Sync failed"); alert(e.message); return; }
+
+  if(r.missing){ setStatus("Nothing saved in that repo yet — push first."); return; }
+
+  var remoteRev = (r.payload.sync && r.payload.sync.rev) || 0;
+  var verdict = force ? "adopt-remote" : compareRevs(remoteRev, c);
+
+  if(verdict === "conflict"){ showConflict(r.payload, r.sha, "pull"); return; }
+  if(verdict === "push-needed"){ setStatus("This copy is ahead — push instead."); return; }
+  if(verdict === "up-to-date"){ setStatus("Already up to date"); return; }
+
+  applyPayload(r.payload);
+  c.rev = remoteRev; c.baseRev = remoteRev;
+  c.modified = (r.payload.sync && r.payload.sync.modified) || new Date().toISOString();
+  saveSyncCfg(c);
+  setStatus("Pulled " + describePayload(r.payload));
+}
+
+/* ---- push ---- */
+async function syncPush(force){
+  var c = requireConfig(); if(!c) return;
+  saveNow();
+  setStatus("Checking…");
+  var r;
+  try { r = await ghRead(c); }
+  catch(e){ setStatus("Sync failed"); alert(e.message); return; }
+
+  var sha = r.missing ? null : r.sha;
+  if(!r.missing && !force){
+    var remoteRev = (r.payload.sync && r.payload.sync.rev) || 0;
+    var verdict = compareRevs(remoteRev, c);
+    if(verdict === "conflict"){ showConflict(r.payload, r.sha, "push"); return; }
+    if(verdict === "adopt-remote"){ setStatus("Remote is newer — pull first."); return; }
+    if(verdict === "up-to-date"){ setStatus("Nothing to push"); return; }
+  }
+
+  var payload = buildPayload();
+  setStatus("Pushing…");
+  try { await ghWrite(c, payload, sha); }
+  catch(e){ setStatus("Push failed"); alert(e.message); return; }
+
+  var c2 = loadSyncCfg();
+  c2.baseRev = payload.sync.rev;
+  c2.modified = payload.sync.modified;
+  saveSyncCfg(c2);
+  setStatus("Pushed " + describePayload(payload));
+}
+
+/* ---- conflict: block the write, show both, back up the loser ---- */
+var pendingConflict = null;
+function showConflict(remotePayload, sha, origin){
+  pendingConflict = { remote:remotePayload, sha:sha, origin:origin };
+  var c = loadSyncCfg();
+  var mine = buildPayload();
+  var rs = remotePayload.sync || {};
+  var el = $("#conflictBody");
+  el.innerHTML =
+      '<p class="bgt-ordersub">Both copies changed since they last matched. Nothing has been'
+    + ' overwritten. Choose which to keep — the other is downloaded as a backup first.</p>'
+    + '<div class="bgt-cflist">'
+    +   '<div class="bgt-cfcard"><h4>This device</h4>'
+    +     '<div class="bgt-cfmeta">' + esc(c.device) + '</div>'
+    +     '<div class="bgt-cfmeta">' + esc(fmtWhen(mine.sync.modified)) + '</div>'
+    +     '<div class="bgt-cfmeta">rev ' + mine.sync.rev + '</div>'
+    +     '<div class="bgt-cfsum">' + esc(describePayload(mine)) + '</div>'
+    +     '<button class="bgt-btn" data-action="cf-mine">Keep this device’s copy</button></div>'
+    +   '<div class="bgt-cfcard"><h4>In the repo</h4>'
+    +     '<div class="bgt-cfmeta">' + esc(rs.device || "unknown device") + '</div>'
+    +     '<div class="bgt-cfmeta">' + esc(fmtWhen(rs.modified)) + '</div>'
+    +     '<div class="bgt-cfmeta">rev ' + (rs.rev || 0) + '</div>'
+    +     '<div class="bgt-cfsum">' + esc(describePayload(remotePayload)) + '</div>'
+    +     '<button class="bgt-btn" data-action="cf-remote">Keep the repo’s copy</button></div>'
+    + '</div>';
+  $("#conflictWrap").style.display = "flex";
+  setStatus("Conflict — nothing overwritten");
+}
+function fmtWhen(iso){
+  if(!iso) return "unknown time";
+  try { return new Date(iso).toLocaleString(); } catch(e){ return iso; }
+}
+function closeConflict(){ $("#conflictWrap").style.display = "none"; pendingConflict = null; }
+
+async function resolveConflict(keep){
+  if(!pendingConflict) return;
+  var pc = pendingConflict, c = loadSyncCfg();
+  var stamp = new Date().toISOString().slice(0,10);
+  if(keep === "mine"){
+    /* back up the copy being discarded, then overwrite it */
+    download("budget-backup-repo-" + stamp + ".json", JSON.stringify(pc.remote, null, 2));
+    var payload = buildPayload();
+    setStatus("Pushing…");
+    try { await ghWrite(c, payload, pc.sha, "budget: resolve conflict, keep " + c.device); }
+    catch(e){ setStatus("Push failed"); alert(e.message); return; }
+    var c2 = loadSyncCfg(); c2.baseRev = payload.sync.rev; saveSyncCfg(c2);
+    setStatus("Kept this device’s copy");
+  } else {
+    download("budget-backup-local-" + stamp + ".json", JSON.stringify(buildPayload(), null, 2));
+    applyPayload(pc.remote);
+    var rr = (pc.remote.sync && pc.remote.sync.rev) || 0;
+    var c3 = loadSyncCfg(); c3.rev = rr; c3.baseRev = rr; saveSyncCfg(c3);
+    setStatus("Kept the repo’s copy");
+  }
+  closeConflict();
+}
+
+/* ---- settings panel ---- */
+function onSharedPagesOrigin(){ return /\.github\.io$/i.test(location.hostname); }
+
+function openSyncPanel(){
+  var c = loadSyncCfg();
+  $("#syncOwner").value  = c.owner;
+  $("#syncRepo").value   = c.repo;
+  $("#syncPath").value   = c.path;
+  $("#syncBranch").value = c.branch;
+  $("#syncToken").value  = getToken();
+  $("#syncAuto").checked = !!c.auto;
+  $("#syncWarn").style.display = onSharedPagesOrigin() ? "" : "none";
+  $("#syncState").textContent =
+      "rev " + (c.rev||0) + " here, last exchanged at rev " + (c.baseRev||0)
+    + (hasLocalEdits() ? " — unpushed changes" : " — nothing pending");
+  $("#syncWrap").style.display = "flex";
+}
+function closeSyncPanel(){ $("#syncWrap").style.display = "none"; }
+function saveSyncPanel(){
+  var c = loadSyncCfg();
+  c.owner  = $("#syncOwner").value.trim();
+  c.repo   = $("#syncRepo").value.trim();
+  c.path   = $("#syncPath").value.trim() || "budget-data.json";
+  c.branch = $("#syncBranch").value.trim() || "main";
+  c.auto   = $("#syncAuto").checked;
+  saveSyncCfg(c);
+  setToken($("#syncToken").value.trim());
+  closeSyncPanel();
+  setStatus("Sync settings saved");
+}
+function forgetToken(){
+  setToken("");
+  $("#syncToken").value = "";
+  setStatus("Token removed from this browser");
+}
+
 /* ----------------------------- actions --------------------------- */
 var saveTimer = null;
 function setStatus(s){ var e = $("#saveStatus"); if(e) e.textContent = s; }
 function scheduleSave(){
   setStatus("Saving\u2026");
   if(saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(function(){ saveMonth(state.monthKey, state.data); setStatus("All changes saved"); }, 400);
+  saveTimer = setTimeout(function(){ flushSave(); maybeAutoPush(); }, 400);
 }
-function saveNow(){ if(saveTimer) clearTimeout(saveTimer); saveMonth(state.monthKey, state.data); setStatus("All changes saved"); }
+function saveNow(){ flushSave(); }
+
+/* A debounced save is lost if the tab closes inside the debounce window,
+   so this path is also called on the way out. */
+function flushSave(){
+  if(saveTimer){ clearTimeout(saveTimer); saveTimer = null; }
+  /* Advance the revision only when the stored bytes actually change.
+     Saving is called on many paths (including before a push), and a rev
+     that moves without an edit would make this copy look permanently
+     ahead of the repo. */
+  var before = lsGet("budget:m:" + state.monthKey);
+  saveMonth(state.monthKey, state.data);
+  var after = lsGet("budget:m:" + state.monthKey);
+  if(before !== after) bumpRev();
+  setStatus("All changes saved");
+}
+var autoPushTimer = null;
+function maybeAutoPush(){
+  var c = loadSyncCfg();
+  if(!c.auto || !c.owner || !c.repo || !getToken()) return;
+  if(autoPushTimer) clearTimeout(autoPushTimer);
+  autoPushTimer = setTimeout(function(){ syncPush(); }, 2500);
+}
 
 function findItem(cat, id){ var a = state.data[cat]; for(var i=0;i<a.length;i++){ if(a[i].id===id) return a[i]; } return null; }
 
@@ -964,6 +1347,15 @@ function wireEvents(){
     else if(a==="next"){ navMonth(1); }
     else if(a==="copycard"){ copyCard(b.dataset.cat); }
     else if(a==="loadshared"){ importSharedExpenses(); }
+    else if(a==="sync-open"){ openSyncPanel(); }
+    else if(a==="sync-close"){ closeSyncPanel(); }
+    else if(a==="sync-save"){ saveSyncPanel(); }
+    else if(a==="sync-forget"){ forgetToken(); }
+    else if(a==="sync-push"){ syncPush(); }
+    else if(a==="sync-pull"){ syncPull(); }
+    else if(a==="cf-mine"){ resolveConflict("mine"); }
+    else if(a==="cf-remote"){ resolveConflict("remote"); }
+    else if(a==="cf-cancel"){ closeConflict(); }
     else if(a==="export"){ exportData(); }
     else if(a==="import"){ $("#fileInput").click(); }
   });
@@ -994,6 +1386,12 @@ function init(){
   wireEvents();
   renderLines();
   updateDerived();
+
+  window.addEventListener("beforeunload", flushSave);
+  window.addEventListener("pagehide", flushSave);
+  document.addEventListener("visibilitychange", function(){
+    if(document.visibilityState === "hidden") flushSave();
+  });
 }
 init();
 </script>
