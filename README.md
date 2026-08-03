@@ -25,15 +25,55 @@ Open `budget.html` in any modern browser, or visit the hosted copy. That's it.
 This repo ships with **no personal financial data** — all months start blank. There are three ways to get numbers in:
 
 1. **Type them in** directly.
-2. **Load an Excel sheet** — the "Load shared expenses" button on the Shared card opens a file picker and reads an `.xlsx` right in the browser. Nothing is uploaded; the file is unzipped and parsed locally using native browser APIs (`DecompressionStream`, `TextDecoder`) with no libraries.
+2. **Load shared expenses from your private repo** — see below.
 3. **Export / Load JSON** — the Export button saves a snapshot of every month; Load restores it. Useful for backups or moving between browsers.
-4. **Sync with a private repo** — see below.
+4. **Sync the whole budget with a private repo** — see below.
+
+### Shared expenses
+
+**Load shared expenses** on the Shared card reads a household-expense file from your private repo — `expenses.json` by default — and fills in whichever month you're viewing.
+
+**This file is read-only.** It is owned by a separate application; the budget planner never writes to it. That is enforced in `ghWrite`, which refuses any request aimed at the configured shared-expenses path, so no future code path can write to it by accident.
+
+Expected shape:
+
+```json
+{
+  "app": "household-expense-manager",
+  "people": [{ "id": "alex", "name": "Alex" }, { "id": "sam", "name": "Sam" }],
+  "years": {
+    "2026": {
+      "categories": [
+        { "name": "Rent",  "kind": "normal",    "onCard": null,
+          "split": { "mode": "even" },
+          "amounts": { "1": 2200, "2": 2200 } },
+        { "name": "Card",  "kind": "statement", "onCard": null,
+          "split": { "mode": "solo", "personId": "alex" },
+          "amounts": { "1": 812.4 } }
+      ]
+    }
+  }
+}
+```
+
+How each field is read:
+
+| Field | Effect |
+| --- | --- |
+| `onCard` set | Skipped — the charge is already inside a statement line listed separately, so counting it again would double it |
+| `split.mode: "even"` | 50% |
+| `split.mode: "solo"` | 100% if `personId` is you, 0% otherwise |
+| `amounts` | Keyed by month number, `"1"`–`"12"` |
+
+**You are** in the Sync panel picks which person you are; it's populated from the file's `people` list on first load.
+
+The file has no concept of a fixed amount one person always pays on top of a split. If you need that, set the **+** field on a line and the app remembers it for that expense name — but nothing of the sort is ever assumed for you.
 
 ### Syncing across machines
 
 **Sync…** stores your budget as a single JSON file in a private GitHub repository. **Push** sends this browser's copy up, **Pull** brings the other machine's copy down.
 
-Settings: repository owner, name, file path and branch, plus a fine-grained access token scoped to that one repository with **Contents: Read and write**.
+Settings: repository owner and name, the budget file path, the shared-expenses file path, the branch, and a fine-grained access token scoped to that one repository with **Contents: Read and write**.
 
 Three things are kept in separate browser storage keys and never mixed: the budget data (the only thing that travels), the repo configuration, and the token. An exported or synced file therefore cannot carry a credential, and a leaked data file reveals nothing about where it came from.
 

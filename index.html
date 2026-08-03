@@ -170,9 +170,6 @@ var CURRENCIES = ["USD","EUR","GBP","CAD","MXN","COP","AUD","JPY","BRL","CHF"];
 /* ---- Shared Account shared-expense data (from spreadsheet) ---- */
 var SHARED_EXPENSE_DATA = {}; /* populate via "Load" (Export/Import JSON), or fill in your own data here */
 
-/* AT&T fixed-extra lookup — applied automatically on import */
-var ATT_EXTRA = 10.67;
-var ATT_NAMES = ["AT&T", "AT&T (3rd)"];
 var ACCOUNTS = [
   { name:"Fixed Checking",     color:"#16243B", soft:"#E6E8ED", icon:"home",   buffer:100 },
   { name:"Variable Checking",  color:"#1F7A5C", soft:"#E4F0EA", icon:"wallet", buffer:100 },
@@ -438,7 +435,6 @@ function shellHTML(){
   +   '</div>'
   + '</div>'
   + '<input type="file" id="fileInput" accept="application/json,.json" style="display:none">'
-  + '<input type="file" id="xlsxInput" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none">'
   + '<div class="bgt-modal" id="syncWrap"><div class="bgt-modalbox">'
   +   '<h3>Sync with a private repo</h3>'
   +   '<p class="bgt-ordersub">Your budget is kept as one JSON file in a repository only you can read. The token stays in this browser and is never included in the file.</p>'
@@ -446,8 +442,10 @@ function shellHTML(){
   +     '<span><b>This page shares an origin with your other GitHub Pages sites.</b> Anything published under the same <code>github.io</code> account can read a token stored here. For a token you care about, open the app from a local copy instead.</span></div>'
   +   '<div class="bgt-row2"><div class="bgt-field"><label>Owner</label><input type="text" id="syncOwner" placeholder="your-username" autocomplete="off"></div>'
   +     '<div class="bgt-field"><label>Repository</label><input type="text" id="syncRepo" placeholder="private-repo" autocomplete="off"></div></div>'
-  +   '<div class="bgt-row2"><div class="bgt-field"><label>File path</label><input type="text" id="syncPath" placeholder="budget-data.json" autocomplete="off"></div>'
+  +   '<div class="bgt-row2"><div class="bgt-field"><label>Budget file</label><input type="text" id="syncPath" placeholder="budget-data.json" autocomplete="off"></div>'
   +     '<div class="bgt-field"><label>Branch</label><input type="text" id="syncBranch" placeholder="main" autocomplete="off"></div></div>'
+  +   '<div class="bgt-row2"><div class="bgt-field"><label>Shared-expenses file &mdash; read only</label><input type="text" id="syncShared" placeholder="expenses.json" autocomplete="off"></div>'
+  +     '<div class="bgt-field"><label>You are</label><select class="bgt-acct" id="syncMe" style="width:100%"></select></div></div>'
   +   '<div class="bgt-field"><label>Access token &mdash; fine-grained, one repository, Contents: Read and write</label>'
   +     '<input type="password" id="syncToken" placeholder="github_pat_..." autocomplete="off"></div>'
   +   '<label class="bgt-check"><input type="checkbox" id="syncAuto"> Push automatically after edits</label>'
@@ -837,7 +835,8 @@ async function readSharedExpensesFromXlsx(file, monthKey){
 var SYNC_KEY = "budget:sync", TOKEN_KEY = "budget:token";
 
 function loadSyncCfg(){
-  var d = { owner:"", repo:"", path:"budget-data.json", branch:"main",
+  var d = { owner:"", repo:"", path:"budget-data.json", sharedPath:"expenses.json", branch:"main",
+            people:[], meId:"",
             rev:0, baseRev:0, modified:"", device:"", auto:false };
   try {
     var s = JSON.parse(lsGet(SYNC_KEY) || "{}");
@@ -954,6 +953,12 @@ async function ghRead(c){
 }
 
 async function ghWrite(c, payload, sha, message){
+  /* The shared-expenses file belongs to another application. Nothing in this
+     app may write to it — enforced here so no future call site can slip past. */
+  var guard = loadSyncCfg();
+  if(c.path && guard.sharedPath && c.path === guard.sharedPath){
+    throw new Error("Refusing to write " + c.path + " — that file is read-only for this app.");
+  }
   var body = { message:message || ("budget: update from " + c.device),
                content:b64encode(JSON.stringify(payload, null, 2)),
                branch:c.branch };
@@ -1116,6 +1121,11 @@ function openSyncPanel(){
   $("#syncRepo").value   = c.repo;
   $("#syncPath").value   = c.path;
   $("#syncBranch").value = c.branch;
+  $("#syncShared").value = sharedPathOf(c);
+  var meSel = $("#syncMe"), ppl = c.people || [];
+  meSel.innerHTML = ppl.length
+    ? ppl.map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===c.meId?" selected":"")+'>'+esc(p.name||p.id)+'</option>'; }).join("")
+    : '<option value="">(load shared expenses once)</option>';
   $("#syncToken").value  = getToken();
   $("#syncAuto").checked = !!c.auto;
   $("#syncWarn").style.display = onSharedPagesOrigin() ? "" : "none";
@@ -1131,6 +1141,8 @@ function saveSyncPanel(){
   c.repo   = $("#syncRepo").value.trim();
   c.path   = $("#syncPath").value.trim() || "budget-data.json";
   c.branch = $("#syncBranch").value.trim() || "main";
+  c.sharedPath = $("#syncShared").value.trim() || "expenses.json";
+  var meVal = $("#syncMe").value; if(meVal) c.meId = meVal;
   c.auto   = $("#syncAuto").checked;
   saveSyncCfg(c);
   setToken($("#syncToken").value.trim());
@@ -1212,40 +1224,111 @@ function splitSettingsFor(name){
       }
     }
   }
-  if(name.indexOf("AT&T") === 0) return { pct:"50", extra:String(ATT_EXTRA) };
   return { pct:"50", extra:"" };
 }
 
-function importSharedExpenses(){
-  $("#xlsxInput").click();          /* pick the spreadsheet; parsed locally */
+/* ---- shared expenses: read-only, from the household-expense file ---- */
+function sharedPathOf(c){ return (c.sharedPath || "expenses.json"); }
+
+async function ghReadPath(c, path){
+  var cc = {}; for(var k in c) cc[k] = c[k];
+  cc.path = path;
+  return await ghRead(cc);
 }
 
-async function loadSharedFromFile(file){
-  setStatus("Reading spreadsheet\u2026");
-  var res;
-  try {
-    res = await readSharedExpensesFromXlsx(file, state.monthKey);
-  } catch(err){
-    setStatus("All changes saved");
-    alert("Couldn't read that spreadsheet.\n\n" + err.message);
+/* The file is produced by a separate household app. Its shape:
+     years -> "2026" -> categories[] -> { name, kind, onCard, split, amounts:{"1".."12"} }
+   Rules:
+     onCard set        -> the charge sits inside a card statement already listed; skip it
+     split.mode "even" -> halved
+     split.mode "solo" -> all of it, or none, depending whose it is           */
+function extractHousehold(doc, monthKey, meId){
+  var parts = monthKey.split("-");
+  var year = parts[0], month = String(parseInt(parts[1], 10));
+
+  var yr = doc.years && doc.years[year];
+  if(!yr) return { data:{}, splits:{}, skipped:[], noYear:true };
+
+  var cats = yr.categories || [];
+  var data = {}, splits = {}, skipped = [];
+
+  cats.forEach(function(cat){
+    var name = cat.name;
+    if(!name) return;
+
+    if(cat.onCard){ skipped.push(name); return; }   /* already inside a statement line */
+
+    var amt = cat.amounts && cat.amounts[month];
+    if(typeof amt !== "number" || !isFinite(amt) || amt === 0) return;
+
+    var sp = cat.split || {}, pct = "50";
+    if(sp.mode === "solo")      pct = (sp.personId === meId) ? "100" : "0";
+    else if(sp.mode === "even") pct = "50";
+
+    data[name] = Math.round(amt * 100) / 100;
+    splits[name] = pct;
+  });
+  return { data:data, splits:splits, skipped:skipped };
+}
+
+async function importSharedExpenses(){
+  var c = requireConfig(); if(!c) return;
+  setStatus("Fetching shared expenses\u2026");
+  var r;
+  try { r = await ghReadPath(c, sharedPathOf(c)); }
+  catch(e){ setStatus("Couldn't load shared expenses"); alert(e.message); return; }
+
+  if(r.missing){
+    setStatus("No " + sharedPathOf(c) + " in that repo");
+    alert("There's no " + sharedPathOf(c) + " in " + c.owner + "/" + c.repo + ".");
+    return;
+  }
+
+  var doc = r.payload;
+  if(!doc || !doc.years){
+    setStatus("Unexpected file");
+    alert("That file doesn't look like a household-expense file.\n\nTop-level keys found: "
+          + Object.keys(doc || {}).join(", "));
+    return;
+  }
+
+  /* remember who's who so the split can be resolved without asking each time */
+  if(doc.people && doc.people.length){
+    c.people = doc.people.map(function(p){ return { id:p.id, name:p.name }; });
+    if(!c.meId || !c.people.some(function(p){ return p.id === c.meId; })) c.meId = c.people[0].id;
+    saveSyncCfg(c);
+  }
+
+  var res = extractHousehold(doc, state.monthKey, c.meId);
+  if(res.noYear){
+    setStatus("No " + state.monthKey.split("-")[0] + " in that file");
+    alert("That file has no data for " + state.monthKey.split("-")[0]
+          + ". Years present: " + Object.keys(doc.years).join(", "));
     return;
   }
   var names = Object.keys(res.data);
   if(!names.length){
-    setStatus("All changes saved");
-    alert("No expense amounts found for " + monthLabel(state.monthKey) + " in that spreadsheet.");
+    setStatus("Nothing for " + monthLabel(state.monthKey));
+    alert("No shared expenses recorded for " + monthLabel(state.monthKey) + ".");
     return;
   }
+  applySharedData(res.data, res.splits, res.skipped.length);
+}
+
+/* The file is authoritative for the percentage. It has no concept of a fixed
+   amount one person always pays, so that is kept from your own settings. */
+function applySharedData(d, splits, rolledUp){
   var acct = (state.data.shared[0] && state.data.shared[0].account) || DEFAULT_ACCT.shared;
+  var names = Object.keys(d);
   state.data.shared = names.map(function(name){
-    var sp = splitSettingsFor(name);
-    return { id:uid(), name:name, amount:String(res.data[name]),
-             sharePct:sp.pct, extra:sp.extra, account:acct };
+    var saved = splitSettingsFor(name);
+    var pct = (splits && splits[name] != null) ? splits[name] : saved.pct;
+    return { id:uid(), name:name, amount:String(d[name]),
+             sharePct:pct, extra:saved.extra || "", account:acct };
   });
   saveNow(); renderLines(); updateDerived();
-  var msg = "Loaded " + names.length + " shared expenses for " + monthLabel(state.monthKey);
-  if(res.skipped && res.skipped.length) msg += " (" + res.skipped.length + " card sub-items rolled up)";
-  setStatus(msg);
+  setStatus("Loaded " + names.length + " for " + monthLabel(state.monthKey)
+            + (rolledUp ? " (" + rolledUp + " card items rolled up)" : ""));
 }
 
 function copyCard(cat){
@@ -1358,11 +1441,6 @@ function wireEvents(){
     else if(a==="cf-cancel"){ closeConflict(); }
     else if(a==="export"){ exportData(); }
     else if(a==="import"){ $("#fileInput").click(); }
-  });
-  $("#xlsxInput").addEventListener("change", function(e){
-    var f = e.target.files && e.target.files[0];
-    e.target.value = "";
-    if(f) loadSharedFromFile(f);
   });
   $("#fileInput").addEventListener("change", function(e){
     var f = e.target.files && e.target.files[0]; if(!f) return;
