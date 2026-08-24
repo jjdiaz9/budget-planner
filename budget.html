@@ -3,1475 +3,328 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Budget &amp; Transfers</title>
+<title>Seed-Starting Mix Calculator — Floret's Magic Mix</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
-*{box-sizing:border-box;}
-html{overflow-y:scroll;}
-html,body{margin:0;background:#EFEAE0;font-family:'Inter',system-ui,sans-serif;color:#16243B;}
-.bgt{--paper:#F6F3EC;--card:#FFFFFF;--ink:#16243B;--soft:#5C6A80;--line:#E7E1D4;
-  background:var(--paper);padding:22px;border-radius:16px;max-width:1180px;margin:18px auto;}
+  :root{
+    --bg:#f7f5f0; --card:#fffdf8; --ink:#2f2a24; --muted:#7a7268;
+    --line:#e2dcd1; --accent:#6d7f5b; --accent-dark:#4f5f40; --warm:#a8763e;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:24px 16px 60px; background:var(--bg); color:var(--ink);
+    font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+  .wrap{max-width:760px;margin:0 auto}
+  header{text-align:center;margin-bottom:24px}
+  h1{font-size:26px;letter-spacing:.02em;margin:0 0 6px;font-weight:600}
+  header p{margin:0;color:var(--muted);font-size:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:18px}
+  h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--warm);margin:0 0 14px;font-weight:700}
 
-.bgt-top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px;}
-.bgt-brand{display:flex;align-items:center;gap:12px;}
-.bgt-logo{width:38px;height:38px;border-radius:11px;background:var(--ink);color:#fff;display:grid;place-items:center;}
-.bgt-kicker{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--soft);}
-.bgt-h1{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:26px;margin:1px 0 0;letter-spacing:-.01em;}
-.bgt-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-.bgt-save{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--soft);min-width:104px;text-align:right;}
-.bgt-toolbar{display:flex;gap:6px;}
-.bgt-btn{font-family:'Inter',sans-serif;font-size:13px;font-weight:500;padding:9px 13px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);cursor:pointer;transition:.15s;}
-.bgt-btn:hover{border-color:var(--ink);}
-.bgt-select{font-family:'IBM Plex Mono',monospace;font-size:13px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);cursor:pointer;}
-.bgt-monthnav{display:flex;align-items:center;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;}
-.bgt-monthnav button{border:none;background:none;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;cursor:pointer;color:var(--ink);}
-.bgt-monthnav button:hover{background:var(--paper);}
-.bgt-month{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;min-width:120px;text-align:center;}
+  .tabs{display:flex;gap:6px;margin-bottom:18px}
+  .tabs button{
+    flex:1;padding:10px 6px;border:1px solid var(--line);background:#fff;color:var(--muted);
+    border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;
+  }
+  .tabs button.on{background:var(--accent);border-color:var(--accent);color:#fff}
 
-.bgt-summary{display:flex;align-items:stretch;background:var(--ink);color:#fff;border-radius:14px;padding:18px 8px;margin-bottom:18px;}
-.bgt-sumcell{flex:1;display:flex;flex-direction:column;gap:3px;padding:0 18px;}
-.bgt-sumdiv{width:1px;background:rgba(255,255,255,.14);}
-.bgt-sumlabel{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.6);}
-.bgt-sumval{font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:26px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;}
-.bgt-sumsub{font-size:12px;color:rgba(255,255,255,.6);}
+  .pane{display:none}
+  .pane.on{display:block}
+  label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+  .hint{font-size:12px;color:var(--muted);font-weight:400;margin-top:6px}
+  input[type=number],select{
+    width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;
+    background:#fff;font-size:16px;color:var(--ink)
+  }
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row > div{flex:1;min-width:130px;margin-bottom:12px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .chips button{
+    padding:6px 12px;border:1px solid var(--line);background:#fff;border-radius:20px;
+    font-size:13px;cursor:pointer;color:var(--ink)
+  }
+  .chips button:hover{border-color:var(--accent);color:var(--accent-dark)}
 
-.bgt-grid{display:grid;grid-template-columns:1.45fr 1fr;gap:18px;align-items:start;}
-.bgt-col{display:flex;flex-direction:column;gap:14px;}
-.bgt-side{position:sticky;top:14px;}
+  .summary{
+    background:var(--accent);color:#fff;border-radius:12px;padding:16px 20px;margin-bottom:18px;
+    display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap
+  }
+  .summary .big{font-size:22px;font-weight:600}
+  .summary .sub{font-size:13px;opacity:.85}
 
-.bgt-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;}
-.bgt-cardhead{display:flex;align-items:flex-start;gap:11px;margin-bottom:12px;}
-.bgt-chip{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex-shrink:0;}
-.bgt-cardtitle{flex:1;min-width:0;}
-.bgt-cardtitle h3{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:16px;margin:0;}
-.bgt-cardtitle p{margin:2px 0 0;font-size:12px;color:var(--soft);}
-.bgt-subtotal{font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:16px;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right;}
-.bgt-subtotal-full{display:block;font-family:'Inter',sans-serif;font-size:11px;font-weight:400;color:var(--soft);text-align:right;margin-top:1px;}
-
-.bgt-rows{display:flex;flex-direction:column;gap:7px;}
-.bgt-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-.bgt-in{font-family:'Inter',sans-serif;font-size:14px;border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:var(--paper);color:var(--ink);outline:none;transition:border-color .15s,background .15s;}
-.bgt-in:focus{border-color:var(--ink);background:#fff;}
-.bgt-name{flex:2 1 130px;min-width:120px;}
-.bgt-acct{font-family:'Inter',sans-serif;font-size:12.5px;border:1px solid var(--line);border-radius:9px;padding:8px 9px;background:var(--paper);color:var(--ink);cursor:pointer;outline:none;flex:1 1 140px;min-width:130px;transition:border-color .15s,background .15s;}
-.bgt-acct:focus{border-color:var(--ink);background:#fff;}
-.bgt-acctbar{display:flex;align-items:center;gap:8px;margin:-2px 0 11px;font-size:12px;color:var(--soft);}
-.bgt-acctbar .bgt-acct{flex:0 1 auto;font-size:12.5px;padding:6px 8px;}
-.bgt-kepbtn{border:1px solid var(--line);background:var(--card);color:var(--ink);font-family:'Inter',sans-serif;font-size:12.5px;font-weight:500;padding:6px 11px;border-radius:9px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;transition:.15s;margin-left:auto;}
-.bgt-kepbtn:hover{border-color:#B0842B;color:#B0842B;}
-.bgt-sheetbtn{margin-left:auto;border:1px solid var(--line);background:none;color:var(--soft);font-family:'Inter',sans-serif;font-size:12px;font-weight:500;padding:6px 10px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:.15s;}
-.bgt-sheetbtn:hover{border-color:#B0842B;color:#B0842B;}
-.bgt-amt{display:flex;align-items:center;border:1px solid var(--line);border-radius:9px;background:var(--paper);padding-left:10px;transition:border-color .15s,background .15s;}
-.bgt-amt:focus-within{border-color:var(--ink);background:#fff;}
-.bgt-cur{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--soft);}
-.bgt-money{border:none;background:none;width:96px;text-align:right;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;padding:9px 10px 9px 4px;}
-.bgt-money:focus{background:none;}
-.bgt-share{display:flex;align-items:center;border:1px solid var(--line);border-radius:9px;background:var(--paper);padding-right:9px;}
-.bgt-share:focus-within{border-color:var(--ink);background:#fff;}
-.bgt-pct{border:none;background:none;width:42px;text-align:right;font-family:'IBM Plex Mono',monospace;padding:9px 3px 9px 9px;}
-.bgt-pctmark{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--soft);}
-.bgt-yourshare{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--soft);font-variant-numeric:tabular-nums;white-space:nowrap;padding:0 2px;}
-.bgt-extra{display:flex;align-items:center;border:1px solid var(--line);border-radius:9px;background:var(--paper);padding-left:7px;gap:1px;}
-.bgt-extra:focus-within{border-color:var(--ink);background:#fff;}
-.bgt-extrain{width:54px;}
-.bgt-del{border:none;background:none;color:var(--soft);width:30px;height:30px;border-radius:8px;display:grid;place-items:center;cursor:pointer;flex-shrink:0;}
-.bgt-del:hover{background:#F7E5DF;color:#BC4A33;}
-.bgt-add{border:1px dashed var(--line);background:none;color:var(--soft);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;padding:9px;border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;flex:1;transition:.15s;}
-.bgt-add:hover{border-color:var(--ink);color:var(--ink);}
-.bgt-cardfoot{display:flex;gap:8px;margin-top:11px;}
-.bgt-copycard{border:1px dashed var(--line);background:none;color:var(--soft);font-family:'Inter',sans-serif;font-size:12.5px;font-weight:500;padding:9px 12px;border-radius:9px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;transition:.15s;}
-.bgt-copycard:hover{border-color:var(--ink);color:var(--ink);}
-.bgt-empty{font-size:13px;color:var(--soft);font-style:italic;margin:4px 0;}
-
-.bgt-rollover .bgt-cardhead{margin-bottom:12px;}
-.bgt-rolllist{display:flex;flex-direction:column;gap:8px;}
-.bgt-rollline{display:flex;align-items:center;gap:10px;}
-.bgt-rollchip{width:26px;height:26px;border-radius:8px;flex-shrink:0;}
-.bgt-rollname{flex:1;font-size:13.5px;font-weight:500;min-width:0;}
-.bgt-rollin{flex:0 0 auto;}
-.bgt-rollin .bgt-money{width:110px;text-align:right;padding-right:10px;}
-.bgt-copy{border:1px solid var(--line);background:var(--card);color:var(--soft);font-family:'Inter',sans-serif;font-size:13px;padding:11px;border-radius:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:.15s;}
-.bgt-copy:hover{border-color:var(--ink);color:var(--ink);}
-
-.bgt-slip{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;position:relative;box-shadow:0 1px 0 var(--line),0 10px 30px rgba(22,36,59,.06);}
-.bgt-slip-perf{position:absolute;left:14px;right:14px;top:46px;border-top:1.5px dashed var(--line);}
-.bgt-slip-head{display:flex;justify-content:space-between;align-items:baseline;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px;margin-bottom:18px;}
-.bgt-slip-month{font-family:'IBM Plex Mono',monospace;font-weight:400;font-size:12px;color:var(--soft);}
-.bgt-slip-empty{margin:6px 0 16px;}
-.bgt-slip-total{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-weight:600;font-size:14px;}
-.bgt-slip-totamt{font-family:'IBM Plex Mono',monospace;font-size:20px;font-variant-numeric:tabular-nums;}
-.bgt-slip-keep{display:flex;align-items:center;gap:7px;margin-top:12px;font-size:12.5px;line-height:1.4;background:var(--paper);border-radius:9px;padding:10px 12px;}
-
-.bgt-ordersub{font-size:12px;color:var(--soft);margin:0 0 14px;line-height:1.45;}
-.bgt-orderlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px;}
-.bgt-orderstep{display:flex;align-items:center;gap:10px;border-left:2px solid var(--line);padding-left:10px;}
-.bgt-ordernum{width:22px;height:22px;border-radius:7px;background:var(--ink);color:#fff;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;display:grid;place-items:center;flex-shrink:0;}
-.bgt-orderbody{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
-.bgt-orderflow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;}
-.bgt-orderfrom{font-weight:500;color:var(--soft);}
-.bgt-orderto{font-weight:600;}
-.bgt-orderarrow{color:var(--line);flex-shrink:0;}
-.bgt-ordernote{font-size:11px;color:var(--soft);line-height:1.35;}
-.bgt-orderamt{font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap;}
-
-.bgt-charttitle{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;margin:0 0 8px;}
-.bgt-chartwrap{margin:0 -6px;}
-.bgt-legend{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;}
-.bgt-legend li{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--soft);}
-.bgt-legend b{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums;}
-.bgt-dot{width:9px;height:9px;border-radius:3px;flex-shrink:0;}
-
-.bgt-modal{position:fixed;inset:0;background:rgba(22,36,59,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:50;}
-.bgt-modalbox{background:var(--card);border-radius:14px;padding:20px;max-width:560px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(22,36,59,.3);}
-.bgt-modalbox h3{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:17px;margin:0 0 4px;}
-.bgt-modalfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
-.bgt-field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;}
-.bgt-field label{font-size:12px;color:var(--soft);font-weight:500;}
-.bgt-field input[type=text],.bgt-field input[type=password]{font-family:'IBM Plex Mono',monospace;font-size:13px;border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:var(--paper);color:var(--ink);outline:none;width:100%;}
-.bgt-field input:focus{border-color:var(--ink);background:#fff;}
-.bgt-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.bgt-check{display:flex;align-items:center;gap:8px;font-size:13px;margin:6px 0 2px;}
-.bgt-warn{display:flex;gap:8px;background:#FBF0E4;border:1px solid #E8D3B0;color:#8A5A12;border-radius:9px;padding:10px 12px;font-size:12.5px;line-height:1.45;margin-bottom:12px;}
-.bgt-syncstate{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--soft);margin-top:10px;}
-.bgt-cflist{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px;}
-.bgt-cfcard{border:1px solid var(--line);border-radius:11px;padding:13px;display:flex;flex-direction:column;gap:3px;}
-.bgt-cfcard h4{font-family:'Space Grotesk',sans-serif;font-size:14px;margin:0 0 4px;}
-.bgt-cfmeta{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--soft);}
-.bgt-cfsum{font-size:12.5px;margin:7px 0 10px;}
-.bgt-cfcard .bgt-btn{width:100%;margin-top:auto;}
-@media (max-width:620px){ .bgt-cflist,.bgt-row2{grid-template-columns:1fr;} }
-
-@media (max-width:820px){
-  .bgt{padding:14px;margin:0;border-radius:0;}
-  .bgt-grid{grid-template-columns:1fr;}
-  .bgt-side{position:static;}
-  .bgt-summary{flex-direction:column;gap:14px;padding:16px;}
-  .bgt-sumdiv{width:auto;height:1px;}
-  .bgt-sumcell{padding:0;flex-direction:row;align-items:baseline;justify-content:space-between;}
-  .bgt-sumval{font-size:22px;}
-}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:11px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+  td.amt{font-weight:600;white-space:nowrap}
+  td.alt{color:var(--muted);font-size:13px}
+  tr:last-child td{border-bottom:none}
+  .group td{padding-top:18px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--warm);font-weight:700;border-bottom:none}
+  .notes{font-size:13px;color:var(--muted)}
+  .notes li{margin-bottom:7px}
+  footer{text-align:center;font-size:12px;color:var(--muted);margin-top:8px}
+  @media print{.tabs,.chips{display:none}body{background:#fff}}
 </style>
 </head>
 <body>
-<div class="bgt" id="app"></div>
+<div class="wrap">
+  <header>
+    <h1>Seed-Starting Mix Calculator</h1>
+    <p>Scales Floret's Magic Seed-Starting Mix to whatever amount you need</p>
+  </header>
+
+  <div class="card">
+    <h2>How much do you need?</h2>
+    <div class="tabs">
+      <button data-tab="batch" class="on">Batches</button>
+      <button data-tab="volume">Total volume</button>
+      <button data-tab="trays">Trays / pots</button>
+    </div>
+
+    <div class="pane on" id="pane-batch">
+      <label for="batches">Number of full batches (1 batch ≈ 4.6 cu ft)</label>
+      <input type="number" id="batches" value="1" min="0" step="0.05">
+      <div class="chips">
+        <button data-batch="0.125">⅛</button>
+        <button data-batch="0.25">¼</button>
+        <button data-batch="0.5">½</button>
+        <button data-batch="1">1</button>
+        <button data-batch="2">2</button>
+        <button data-batch="4">4</button>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-volume">
+      <div class="row">
+        <div>
+          <label for="volAmt">Finished mix needed</label>
+          <input type="number" id="volAmt" value="1" min="0" step="0.1">
+        </div>
+        <div>
+          <label for="volUnit">Unit</label>
+          <select id="volUnit">
+            <option value="0.0283168">liters</option>
+            <option value="0.0334201">quarts (US)</option>
+            <option value="0.133681">gallons (US)</option>
+            <option value="1" selected>cubic feet</option>
+            <option value="27">cubic yards</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-trays">
+      <div class="row">
+        <div>
+          <label for="trayType">Container type</label>
+          <select id="trayType">
+            <option value="0.2894">1020 flat, open (2½" deep)</option>
+            <option value="0.1418" selected>1020 flat, 72-cell insert</option>
+            <option value="0.1187">1020 flat, 128-cell insert</option>
+            <option value="0.2025">1020 flat, 50-cell insert</option>
+            <option value="0.2431">1020 flat, 6-cell jumbo inserts</option>
+            <option value="0.0046">2" soil block</option>
+            <option value="0.0116">3½" pot</option>
+            <option value="0.0191">4" pot</option>
+            <option value="0.0670">6" pot</option>
+            <option value="0.1337">1-gallon pot</option>
+          </select>
+        </div>
+        <div>
+          <label for="trayCount">How many</label>
+          <input type="number" id="trayCount" value="20" min="0" step="1">
+        </div>
+      </div>
+      <div>
+        <label for="waste">Extra for spillage &amp; settling</label>
+        <select id="waste">
+          <option value="0">0%</option>
+          <option value="0.1" selected>10%</option>
+          <option value="0.2">20%</option>
+        </select>
+        <div class="hint">Container volumes are approximate — cell inserts vary by brand.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div>
+      <div class="big" id="sumBatch">1 full batch</div>
+      <div class="sub" id="sumVol">≈ 4.6 cu ft · 34 gal · 129 L of finished mix</div>
+    </div>
+    <div style="text-align:right">
+      <div class="sub">fills about</div>
+      <div class="big" id="sumTrays">32 × 72-cell</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Your recipe</h2>
+    <table>
+      <thead>
+        <tr><th style="width:42%">Ingredient</th><th style="width:29%">Amount</th><th style="width:29%">Also equals</th></tr>
+      </thead>
+      <tbody id="out"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Mixing notes</h2>
+    <ul class="notes">
+      <li>Moisten the base mix first — peat is hydrophobic when dry and mixes far better damp.</li>
+      <li>Blend the three meals together, then fold into the mix and compost in layers so the amendments distribute evenly.</li>
+      <li>This provides all the nutrition seedlings need for 6–8 weeks; no extra fertilizer required.</li>
+      <li>Store leftovers dry until you need them.</li>
+      <li>A white mold-like bloom on the surface is <em>Actinomycetes</em> — beneficial, not a problem.</li>
+      <li>For larger containers, swap the seed-starting mix for a coarser potting soil as the base.</li>
+      <li>Weights are rough estimates from typical bulk densities — use the volume measures as the source of truth.</li>
+    </ul>
+  </div>
+
+  <footer>Recipe: Floret's Magic Seed-Starting Mix · floretflowers.com · © Floret LLC</footer>
+</div>
 
 <script>
-"use strict";
+// ---- Base recipe (1 batch) ----
+const CUP_CUFT = 14.4375 / 1728;      // 1 US cup = 14.4375 cu in
+const GAL_CUFT = 0.133680556;
+const BALE_CUFT = 3.8;                 // 1 bale Pro-Mix BX
+const COMPOST_CUFT = 5 * GAL_CUFT;     // 1 five-gallon bucket
 
-/* ----------------------------- theme ----------------------------- */
-var CAT = {
-  fixed:    { label:"Fixed",    color:"#16243B", soft:"#E6E8ED", icon:"home",   hint:"Rent, insurance, subscriptions — same every month" },
-  variable: { label:"Variable", color:"#1F7A5C", soft:"#E4F0EA", icon:"wallet", hint:"Groceries, fuel, fun — changes month to month" },
-  shared:   { label:"Shared",   color:"#B0842B", soft:"#F4EBD6", icon:"users",  hint:"Enter the full bill and your share % — your part is calculated" },
-  savings:  { label:"Savings",  color:"#5B7DB1", soft:"#E6ECF5", icon:"piggy",  hint:"Set aside this month — use a minus sign to pull money out" }
+const BASE = {
+  mix:      BALE_CUFT,
+  compost:  COMPOST_CUFT,
+  bonemeal: 6,      // cups
+  kelp:     3,      // cups
+  blood:    2.25    // cups
 };
-var CURRENCIES = ["USD","EUR","GBP","CAD","MXN","COP","AUD","JPY","BRL","CHF"];
+const BATCH_CUFT = BASE.mix + BASE.compost +
+  (BASE.bonemeal + BASE.kelp + BASE.blood) * CUP_CUFT;
 
-/* ---- Shared Account shared-expense data (from spreadsheet) ---- */
-var SHARED_EXPENSE_DATA = {}; /* populate via "Load" (Export/Import JSON), or fill in your own data here */
+// approx lb per cup (bulk density estimates)
+const LB_PER_CUP = { bonemeal:0.58, kelp:0.31, blood:0.39 };
 
-var ACCOUNTS = [
-  { name:"Fixed Checking",     color:"#16243B", soft:"#E6E8ED", icon:"home",   buffer:100 },
-  { name:"Variable Checking",  color:"#1F7A5C", soft:"#E4F0EA", icon:"wallet", buffer:100 },
-  { name:"Rewards Checking",   color:"#7A4FA3", soft:"#EEE6F4", icon:"card" },
-  { name:"Shared Account",     color:"#B0842B", soft:"#F4EBD6", icon:"users" },
-  { name:"Short Term Savings", color:"#5B7DB1", soft:"#E6ECF5", icon:"piggy" },
-  { name:"Long Term Savings",  color:"#2F5C8A", soft:"#E0E9F3", icon:"piggy" }
-];
-var ACCT_BY_NAME = {}; ACCOUNTS.forEach(function(a){ ACCT_BY_NAME[a.name] = a; });
-var DEFAULT_ACCT = { fixed:"Fixed Checking", variable:"Variable Checking", shared:"Shared Account", savings:"Long Term Savings" };
-var HUB = "Short Term Savings";
-var ROLLOVER_ACCTS = ["Fixed Checking","Variable Checking","Rewards Checking"];
+// ---- formatting helpers ----
+const EIGHTHS = ['','⅛','¼','⅜','½','⅝','¾','⅞'];
 
-/* ----------------------------- icons ----------------------------- */
-var SVGI = {
-  sparkle:'<path d="M8 2.4l1.3 3.9 3.9 1.3-3.9 1.3L8 12.8 6.7 8.9 2.8 7.6l3.9-1.3z"/>',
-  home:'<path d="M2.5 7.5L8 3l5.5 4.5"/><path d="M4 7v6h8V7"/>',
-  wallet:'<rect x="2.5" y="4.5" width="11" height="8" rx="1.5"/><path d="M10.5 8.5h3"/>',
-  users:'<circle cx="6" cy="6" r="2.2"/><path d="M2.5 13.5c0-2 1.6-3.2 3.5-3.2s3.5 1.2 3.5 3.2"/><circle cx="11.3" cy="6.6" r="1.6"/>',
-  piggy:'<path d="M2.7 9.2a4 4 0 0 1 4-4h3.3a3.5 3.5 0 0 1 3.5 3.5v3.3h-2v1h-2v-1H6.7v1h-2v-1h-2z"/><circle cx="6" cy="8.8" r="0.5"/>',
-  card:'<rect x="2.5" y="4.5" width="11" height="8" rx="1.5"/><path d="M2.5 7.5h11"/>',
-  refresh:'<path d="M12.6 8a4.6 4.6 0 1 1-1.3-3.1"/><path d="M12.9 2.8v3.1h-3.1"/>',
-  trash:'<path d="M3 4.5h10"/><path d="M5.5 4.5V3.2a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1.3"/><path d="M4.6 4.5l.5 8a1 1 0 0 0 1 .95h3.8a1 1 0 0 0 1-.95l.5-8"/>',
-  plus:'<path d="M8 3v10M3 8h10"/>',
-  chevL:'<path d="M10 3L5 8l5 5"/>',
-  chevR:'<path d="M6 3l5 5-5 5"/>',
-  copy:'<rect x="5.3" y="5.3" width="8.2" height="8.2" rx="1.3"/><path d="M3.3 10.5V3.3a.8.8 0 0 1 .8-.8H10.6"/>',
-  arrowR:'<path d="M3 8h9"/><path d="M9 5l3 3-3 3"/>',
-  warn:'<path d="M8 2.2L1.4 14h13.2z"/><path d="M8 6.4v3.2"/><path d="M8 11.5h.01"/>',
-  download:'<path d="M8 2.5v7"/><path d="M5 7l3 3 3-3"/><path d="M3 12.5h10"/>'
-};
-function ic(name){
-  return '<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round">'+(SVGI[name]||"")+'</svg>';
+function frac(n, denom = 8){
+  if (n <= 0) return '0';
+  const whole = Math.floor(n);
+  let e = Math.round((n - whole) * denom);
+  let w = whole, f = e;
+  if (f === denom){ w += 1; f = 0; }
+  const fs = denom === 8 ? EIGHTHS[f] : (f ? f + '/' + denom : '');
+  if (w && fs) return w + fs;
+  if (w) return String(w);
+  if (fs) return fs;
+  return '0';
 }
 
-/* --------------------------- utilities --------------------------- */
-function num(v){ var n = parseFloat(v); return isNaN(n) ? 0 : n; }
-function uid(){ return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2,7); }
-function pad2(n){ return String(n).padStart(2,"0"); }
-function ymKey(d){ return d.getFullYear() + "-" + pad2(d.getMonth()+1); }
-function monthLabel(key){
-  var p = key.split("-"); var d = new Date(parseInt(p[0],10), parseInt(p[1],10)-1, 1);
-  return d.toLocaleDateString(undefined, { month:"long", year:"numeric" });
+function num(n, d = 2){
+  if (n === 0) return '0';
+  if (n < 0.01) return n.toFixed(3);
+  if (n < 1) return n.toFixed(2).replace(/0$/,'');
+  return (Math.round(n * Math.pow(10,d)) / Math.pow(10,d)).toString();
 }
-function shiftMonth(key, delta){
-  var p = key.split("-"); var d = new Date(parseInt(p[0],10), parseInt(p[1],10)-1+delta, 1);
-  return d.getFullYear() + "-" + pad2(d.getMonth()+1);
-}
-function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
 
-function emptyRollover(){ var o={}; ROLLOVER_ACCTS.forEach(function(a){ o[a]=""; }); return o; }
-function rolloverObj(d){ return (d && d.rollover && typeof d.rollover==="object") ? d.rollover : {}; }
-function emptyMonth(){ return { income:[], fixed:[], variable:[], shared:[], savings:[], rollover:emptyRollover() }; }
-function newItem(cat){
-  if(cat==="shared") return { id:uid(), name:"", amount:"", sharePct:"50", extra:"", account:DEFAULT_ACCT.shared };
-  if(cat==="income") return { id:uid(), name:"", amount:"" };
-  return { id:uid(), name:"", amount:"", account:DEFAULT_ACCT[cat] };
+// cups -> friendly cups + tbsp + tsp
+function cupsText(cups){
+  if (cups <= 0) return '0';
+  if (cups >= 1){
+    const rounded = Math.round(cups * 8) / 8;
+    return frac(rounded) + ' cup' + (rounded > 1 ? 's' : '');
+  }
+  let tbsp = cups * 16;
+  if (tbsp >= 1){
+    const whole = Math.floor(tbsp);
+    const tsp = Math.round((tbsp - whole) * 3);
+    let s = (whole + (tsp === 3 ? 1 : 0)) + ' tbsp';
+    if (tsp > 0 && tsp < 3) s += ' + ' + tsp + ' tsp';
+    return s;
+  }
+  return num(cups * 48, 1) + ' tsp';
 }
-function seedMonth(){
-  return {
-    income:[ it("Paycheck","") ],
-    fixed:[ it("Rent",""), it("Phone","") ],
-    variable:[ it("Groceries",""), it("Dining out","") ],
-    shared:[ it("Utilities","","Shared Account",50) ],
-    savings:[ it("Emergency fund","") ],
-    rollover:emptyRollover()
+
+function volAlt(cuft){
+  const gal = cuft / GAL_CUFT;
+  const L = cuft * 28.3168;
+  if (gal < 1) return num(gal * 4, 1) + ' qt · ' + num(L, 1) + ' L';
+  return num(gal, 1) + ' gal · ' + num(L, 0) + ' L';
+}
+
+// ---- state ----
+let mode = 'batch';
+
+document.querySelectorAll('.tabs button').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('on'));
+    document.querySelectorAll('.pane').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    mode = b.dataset.tab;
+    document.getElementById('pane-' + mode).classList.add('on');
+    render();
   };
-}
-function it(name, amount, account, sharePct, extra){
-  var o = { id:uid(), name:name, amount:String(amount) };
-  if(account) o.account = account;
-  if(sharePct !== undefined) o.sharePct = String(sharePct);
-  if(extra !== undefined) o.extra = String(extra);
-  return o;
-}
+});
 
-/* No pre-seeded month data — start blank, or use Export/Load to bring in your own JSON export. */
-var SEED_BUILDERS = {};
-var SEED_VERSION = 3;
+document.querySelectorAll('.chips button').forEach(b => {
+  b.onclick = () => { document.getElementById('batches').value = b.dataset.batch; render(); };
+});
 
-function isEmptyMonth(d){
-  var cats = ["income","fixed","variable","shared","savings"];
-  var anyAmt = cats.some(function(c){ return (d[c]||[]).some(function(i){ return num(i.amount) !== 0; }); });
-  var ro = rolloverObj(d);
-  var anyRoll = Object.keys(ro).some(function(k){ return num(ro[k]) !== 0; });
-  return !anyAmt && !anyRoll;
-}
+['batches','volAmt','volUnit','trayType','trayCount','waste']
+  .forEach(id => document.getElementById(id).addEventListener('input', render));
 
-function normalize(d){
-  function fix(arr, cat){
-    return (arr||[]).map(function(i){
-      var o = {}; for(var k in i){ o[k]=i[k]; }
-      o.account = i.account || DEFAULT_ACCT[cat];
-      if(cat==="shared"){ o.sharePct = (i.sharePct==null?"50":i.sharePct); o.extra = (i.extra==null?"":i.extra); }
-      return o;
-    });
+function val(id){ const v = parseFloat(document.getElementById(id).value); return isFinite(v) && v > 0 ? v : 0; }
+
+function scale(){
+  if (mode === 'batch') return val('batches');
+  if (mode === 'volume'){
+    const per = parseFloat(document.getElementById('volUnit').value);
+    return (val('volAmt') * per) / BATCH_CUFT;
   }
-  var roll = {}; var src = (d.rollover && typeof d.rollover==="object") ? d.rollover : {};
-  var base = emptyRollover(); for(var k in base) roll[k]=base[k]; for(var k2 in src) roll[k2]=src[k2];
-  return {
-    income:(d.income||[]).map(function(i){ var o={}; for(var k in i) o[k]=i[k]; return o; }),
-    fixed:fix(d.fixed,"fixed"), variable:fix(d.variable,"variable"),
-    shared:fix(d.shared,"shared"), savings:fix(d.savings,"savings"),
-    rollover:roll, _sv:d._sv
-  };
+  const per = parseFloat(document.getElementById('trayType').value);
+  const waste = parseFloat(document.getElementById('waste').value);
+  return (val('trayCount') * per * (1 + waste)) / BATCH_CUFT;
 }
 
-/* --------------------------- computation ------------------------- */
-function sharedPart(i){ var extra = num(i.extra); return (num(i.amount) - extra) * (num(i.sharePct)/100) + extra; }
-function grossByAccount(d){
-  var g = {};
-  function add(acct, amt){ if(acct){ g[acct] = (g[acct]||0) + amt; } }
-  (d.fixed||[]).forEach(function(i){ add(i.account, num(i.amount)); });
-  (d.variable||[]).forEach(function(i){ add(i.account, num(i.amount)); });
-  (d.shared||[]).forEach(function(i){ add(i.account, sharedPart(i)); });
-  (d.savings||[]).forEach(function(i){ add(i.account, num(i.amount)); });
-  return g;
-}
-function computeTotals(d){
-  function sum(a){ return a.reduce(function(s,i){ return s + num(i.amount); }, 0); }
-  var income = sum(d.income), fixed = sum(d.fixed), variable = sum(d.variable);
-  var sharedFull = sum(d.shared);
-  var sharedYou = d.shared.reduce(function(s,i){ return s + sharedPart(i); }, 0);
-  var savings = sum(d.savings);
-  var ro = rolloverObj(d);
-  var rollover = ROLLOVER_ACCTS.reduce(function(s,a){ return s + num(ro[a]); }, 0);
-  var available = income + rollover;
-  var g = grossByAccount(d);
-  var outflow = Object.keys(g).reduce(function(s,acct){
-    if(acct===HUB) return s;
-    var buf = g[acct] > 0 ? ((ACCT_BY_NAME[acct] && ACCT_BY_NAME[acct].buffer) || 0) : 0;
-    return s + g[acct] + buf;
-  }, 0);
-  var hubAllocated = g[HUB] || 0;                 /* savings parked in Short Term Savings (earmarked, not free) */
-  var totalAllocated = outflow + hubAllocated;     /* everything assigned a job */
-  var remaining = available - outflow;             /* total amount that stays in Short Term Savings */
-  var freeBuffer = available - totalAllocated;      /* truly unallocated */
-  return { income:income, fixed:fixed, variable:variable, sharedFull:sharedFull, sharedYou:sharedYou,
-           savings:savings, rollover:rollover, available:available, outflow:outflow, remaining:remaining,
-           hubAllocated:hubAllocated, totalAllocated:totalAllocated, freeBuffer:freeBuffer };
-}
-function buildPlan(data){
-  var grp = {};
-  function push(acct, amt, label){
-    if(!acct) return;
-    if(!grp[acct]) grp[acct] = { gross:0, cats:[] };
-    grp[acct].gross += amt;
-    if(amt !== 0 && grp[acct].cats.indexOf(label)<0) grp[acct].cats.push(label);
-  }
-  data.fixed.forEach(function(i){ push(i.account, num(i.amount), "Fixed"); });
-  data.variable.forEach(function(i){ push(i.account, num(i.amount), "Variable"); });
-  data.shared.forEach(function(i){ push(i.account, sharedPart(i), "Shared (your share)"); });
-  data.savings.forEach(function(i){ push(i.account, num(i.amount), "Savings"); });
-  var ro = rolloverObj(data);
-  var transfers = ACCOUNTS.filter(function(a){ return a.name!==HUB && grp[a.name] && grp[a.name].gross!==0; }).map(function(a){
-    var gross = grp[a.name].gross, cats = grp[a.name].cats.join(" \u00b7 ");
-    var base = { label:a.name, color:a.color, soft:a.soft };
-    if(gross < 0){ base.direction="out"; base.amount=-gross; base.note=cats; return base; }
-    var buffer = a.buffer || 0, target = gross + buffer;
-    var offset = ROLLOVER_ACCTS.indexOf(a.name)>=0 ? Math.min(num(ro[a.name]), target) : 0;
-    var net = target - offset;
-    var parts = [cats];
-    if(offset > 0) parts.push(fmt(offset) + " already in account");
-    if(buffer > 0) parts.push(fmt(buffer) + " buffer");
-    base.direction = net > 0 ? "in" : "covered"; base.amount = net; base.note = parts.join(" \u00b7 ");
-    return base;
-  });
-  var STAGING = "Variable Checking";
-  var stageGross = grp[STAGING] ? grp[STAGING].gross : 0;
-  var stageBuf = (ACCT_BY_NAME[STAGING] && ACCT_BY_NAME[STAGING].buffer) || 0;
-  var stageKeep = stageGross + stageBuf;
-  var stageNeed = stageKeep - num(ro[STAGING]);
-  var othersIn = transfers.filter(function(x){ return x.direction==="in" && x.label!==STAGING; }).reduce(function(s,x){ return s+x.amount; },0);
-  var drawIns = transfers.filter(function(x){ return x.direction==="out"; });
-  var staging = stageNeed + othersIn - drawIns.reduce(function(s,x){ return s+x.amount; },0);
-  var order = [];
-  if(staging > 0.005) order.push({ from:HUB, to:STAGING, amount:staging, meta:ACCT_BY_NAME[STAGING], note:"Lump that funds the steps below" });
-  else if(staging < -0.005) order.push({ from:STAGING, to:HUB, amount:-staging, meta:ACCT_BY_NAME[HUB], note:"Return surplus to savings" });
-  drawIns.forEach(function(x){ order.push({ from:x.label, to:STAGING, amount:x.amount, meta:ACCT_BY_NAME[x.label], note:x.note }); });
-  transfers.filter(function(x){ return x.direction==="in" && x.label!==STAGING; }).forEach(function(x){
-    order.push({ from:STAGING, to:x.label, amount:x.amount, meta:ACCT_BY_NAME[x.label], note:x.note });
-  });
-  var totalBuffer = ACCOUNTS.reduce(function(s,a){ return (a.buffer && grp[a.name] && grp[a.name].gross>0) ? s+a.buffer : s; }, 0);
-  return { transfers:transfers, order:order, staging:staging, stageKeep:stageKeep, totalBuffer:totalBuffer };
-}
+function render(){
+  const s = scale();
+  const total = BATCH_CUFT * s;
 
-/* ---------------------------- storage ---------------------------- */
-var LS = window.localStorage;
-function lsGet(k){ try { return LS.getItem(k); } catch(e){ return null; } }
-function lsSet(k,v){ try { LS.setItem(k,v); } catch(e){} }
-function lsDel(k){ try { LS.removeItem(k); } catch(e){} }
-function loadMonthRaw(k){ var s = lsGet("budget:m:"+k); if(!s) return null; try { return JSON.parse(s); } catch(e){ return null; } }
-function saveMonth(k,d){ lsSet("budget:m:"+k, JSON.stringify(d)); }
-function allMonthKeys(){
-  var ks = [];
-  try { for(var i=0;i<LS.length;i++){ var k=LS.key(i); if(k && k.indexOf("budget:m:")===0) ks.push(k.slice(9)); } } catch(e){}
-  return ks;
-}
-function loadCurrency(){ return lsGet("budget:currency"); }
-function saveCurrency(c){ lsSet("budget:currency", c); }
+  // summary
+  document.getElementById('sumBatch').textContent =
+    s === 0 ? '—' : frac(Math.round(s * 16) / 16, 16) + (s === 1 ? ' full batch' : ' batches');
+  document.getElementById('sumVol').textContent =
+    s === 0 ? 'Enter an amount above' : '≈ ' + num(total) + ' cu ft · ' + volAlt(total);
+  document.getElementById('sumTrays').textContent =
+    s === 0 ? '—' : Math.floor(total / 0.1418) + ' × 72-cell';
 
-function getMonth(key){
-  var loaded = loadMonthRaw(key);
-  var seedable = SEED_BUILDERS[key];
-  var needsSeed = seedable && (!loaded || isEmptyMonth(loaded) || (loaded._sv || 0) < SEED_VERSION);
-  if(needsSeed){
-    var seeded = seedable(); seeded._sv = SEED_VERSION;
-    var d = normalize(seeded); saveMonth(key, d); return d;
-  }
-  if(loaded) return normalize(loaded);
-  var exists = allMonthKeys().length > 0;
-  return normalize(exists ? emptyMonth() : seedMonth());
-}
+  const mixCuft = BASE.mix * s;
+  const compCuft = BASE.compost * s;
 
-/* ----------------------------- state ----------------------------- */
-var state = { monthKey:null, data:null, currency:"USD" };
-var app, fmtCache = {};
-function fmt(n){
-  var f = fmtCache[state.currency];
-  if(!f){ f = new Intl.NumberFormat(undefined, { style:"currency", currency:state.currency, maximumFractionDigits:2 }); fmtCache[state.currency] = f; }
-  return f.format(n || 0);
-}
-function sym(){
-  try {
-    var parts = new Intl.NumberFormat(undefined, { style:"currency", currency:state.currency }).formatToParts(0);
-    for(var i=0;i<parts.length;i++){ if(parts[i].type==="currency") return parts[i].value; }
-  } catch(e){}
-  return "$";
-}
-function $(sel){ return document.querySelector(sel); }
-
-/* ---------------------------- rendering -------------------------- */
-function shellHTML(){
-  return ''
-  + '<div class="bgt-top">'
-  +   '<div class="bgt-brand"><span class="bgt-logo">'+ic("wallet")+'</span><div><div class="bgt-kicker">Monthly plan</div><h1 class="bgt-h1">Budget &amp; Transfers</h1></div></div>'
-  +   '<div class="bgt-controls">'
-  +     '<span class="bgt-save" id="saveStatus">All changes saved</span>'
-  +     '<div class="bgt-toolbar"><button class="bgt-btn" data-action="sync-pull" title="Fetch the copy in your private repo">Pull</button><button class="bgt-btn" data-action="sync-push" title="Send this copy to your private repo">Push</button><button class="bgt-btn" data-action="sync-open" title="Sync settings">Sync\u2026</button><button class="bgt-btn" data-action="export">Export</button><button class="bgt-btn" data-action="import">Load</button></div>'
-  +     '<select class="bgt-select" id="currencySel">'+CURRENCIES.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join("")+'</select>'
-  +     '<div class="bgt-monthnav"><button data-action="prev" aria-label="Previous month">'+ic("chevL")+'</button><span class="bgt-month" id="monthLabel"></span><button data-action="next" aria-label="Next month">'+ic("chevR")+'</button></div>'
-  +   '</div>'
-  + '</div>'
-  + '<div class="bgt-summary">'
-  +   '<div class="bgt-sumcell"><span class="bgt-sumlabel">Available</span><span class="bgt-sumval" id="sumAvailable"></span><span class="bgt-sumsub" id="sumAvailableSub"></span></div>'
-  +   '<div class="bgt-sumdiv"></div>'
-  +   '<div class="bgt-sumcell"><span class="bgt-sumlabel">Allocated</span><span class="bgt-sumval" id="sumAllocated"></span><span class="bgt-sumsub">expenses, savings &amp; buffers</span></div>'
-  +   '<div class="bgt-sumdiv"></div>'
-  +   '<div class="bgt-sumcell"><span class="bgt-sumlabel" id="sumRemainLabel"></span><span class="bgt-sumval" id="sumRemaining"></span><span class="bgt-sumsub" id="sumRemainSub"></span></div>'
-  + '</div>'
-  + '<div class="bgt-grid">'
-  +   '<div class="bgt-col">'
-  +     '<section class="bgt-card bgt-rollover"><header class="bgt-cardhead"><span class="bgt-chip" style="background:#EFE9DA;color:#B0842B">'+ic("refresh")+'</span>'
-  +       '<div class="bgt-cardtitle"><h3>Rollover from last month</h3><p>Leftover balances in these accounts — each lowers what you transfer in this month</p></div>'
-  +       '<span class="bgt-subtotal" id="rolloverTotal" style="color:#B0842B"></span></header><div class="bgt-rolllist" id="rolloverList"></div></section>'
-  +     cardShell("income") + cardShell("fixed") + cardShell("variable") + cardShell("shared") + cardShell("savings")
-  +   '</div>'
-  +   '<div class="bgt-col bgt-side">'
-  +     '<section class="bgt-slip"><div class="bgt-slip-perf"></div><div class="bgt-slip-head"><span>Transfers to make</span><span class="bgt-slip-month" id="slipMonth"></span></div><div id="slipBody"></div></section>'
-  +     '<section class="bgt-card"><h3 class="bgt-charttitle">Where the money goes</h3><div class="bgt-chartwrap" id="pieWrap"></div><ul class="bgt-legend" id="pieLegend"></ul></section>'
-  +     '<section class="bgt-card"><h3 class="bgt-charttitle">In vs. allocated</h3><div id="barWrap"></div></section>'
-  +   '</div>'
-  +   '</div>'
-  + '</div>'
-  + '<input type="file" id="fileInput" accept="application/json,.json" style="display:none">'
-  + '<div class="bgt-modal" id="syncWrap"><div class="bgt-modalbox">'
-  +   '<h3>Sync with a private repo</h3>'
-  +   '<p class="bgt-ordersub">Your budget is kept as one JSON file in a repository only you can read. The token stays in this browser and is never included in the file.</p>'
-  +   '<div class="bgt-warn" id="syncWarn" style="display:none">' + ic("warn")
-  +     '<span><b>This page shares an origin with your other GitHub Pages sites.</b> Anything published under the same <code>github.io</code> account can read a token stored here. For a token you care about, open the app from a local copy instead.</span></div>'
-  +   '<div class="bgt-row2"><div class="bgt-field"><label>Owner</label><input type="text" id="syncOwner" placeholder="your-username" autocomplete="off"></div>'
-  +     '<div class="bgt-field"><label>Repository</label><input type="text" id="syncRepo" placeholder="private-repo" autocomplete="off"></div></div>'
-  +   '<div class="bgt-row2"><div class="bgt-field"><label>Budget file</label><input type="text" id="syncPath" placeholder="budget-data.json" autocomplete="off"></div>'
-  +     '<div class="bgt-field"><label>Branch</label><input type="text" id="syncBranch" placeholder="main" autocomplete="off"></div></div>'
-  +   '<div class="bgt-row2"><div class="bgt-field"><label>Shared-expenses file &mdash; read only</label><input type="text" id="syncShared" placeholder="expenses.json" autocomplete="off"></div>'
-  +     '<div class="bgt-field"><label>You are</label><select class="bgt-acct" id="syncMe" style="width:100%"></select></div></div>'
-  +   '<div class="bgt-field"><label>Access token &mdash; fine-grained, one repository, Contents: Read and write</label>'
-  +     '<input type="password" id="syncToken" placeholder="github_pat_..." autocomplete="off"></div>'
-  +   '<label class="bgt-check"><input type="checkbox" id="syncAuto"> Push automatically after edits</label>'
-  +   '<p class="bgt-ordernote">Leaving this off is recommended: every push becomes a commit, and turning it on makes the history noisy.</p>'
-  +   '<div class="bgt-syncstate" id="syncState"></div>'
-  +   '<div class="bgt-modalfoot"><button class="bgt-btn" data-action="sync-forget">Forget token</button>'
-  +     '<button class="bgt-btn" data-action="sync-close">Cancel</button>'
-  +     '<button class="bgt-btn" data-action="sync-save">Save</button></div>'
-  + '</div></div>'
-  + '<div class="bgt-modal" id="conflictWrap"><div class="bgt-modalbox">'
-  +   '<h3>Two copies have diverged</h3><div id="conflictBody"></div>'
-  +   '<div class="bgt-modalfoot"><button class="bgt-btn" data-action="cf-cancel">Cancel</button></div>'
-  + '</div></div>';
-}
-function cardShell(cat){
-  var m = (cat==="income") ? { label:"Income", hint:"Paychecks land in Short Term Savings", color:"#1F7A5C", soft:"#E4F0EA", icon:"sparkle" } : CAT[cat];
-  var acctBar = "";
-  if(cat==="shared"){
-    acctBar = '<div class="bgt-acctbar"><span>Transfer all to</span><select class="bgt-acct" id="sharedAcctSel" title="Account that receives your shared total">'
-      + ACCOUNTS.map(function(a){ return '<option value="'+esc(a.name)+'">'+esc(a.name)+'</option>'; }).join("")
-      + '</select>'
-      + '<button class="bgt-kepbtn" data-action="loadshared">'+ic("copy")+' Load shared expenses</button>'
-      + '</div>';
-  }
-  return '<section class="bgt-card"><header class="bgt-cardhead"><span class="bgt-chip" style="background:'+m.soft+';color:'+m.color+'">'+ic(m.icon)+'</span>'
-    + '<div class="bgt-cardtitle"><h3>'+m.label+'</h3><p>'+m.hint+'</p></div>'
-    + '<span class="bgt-subtotal" id="sub-'+cat+'" style="color:'+m.color+'"></span></header>'
-    + acctBar
-    + '<div class="bgt-rows" id="lines-'+cat+'"></div>'
-    + '<div class="bgt-cardfoot"><button class="bgt-add" data-action="add" data-cat="'+cat+'">'+ic("plus")+' Add line</button>'
-    + '<button class="bgt-copycard" data-action="copycard" data-cat="'+cat+'" title="Copy last month\u2019s lines" style="display:none">'+ic("copy")+' Last month</button></div></section>';
-}
-
-function rowHTML(cat, i){
-  var isIncome = cat==="income", showShare = cat==="shared";
-  var html = '<div class="bgt-row">';
-  html += '<input class="bgt-in bgt-name" placeholder="Description" data-cat="'+cat+'" data-id="'+i.id+'" data-field="name" value="'+esc(i.name)+'">';
-  html += '<div class="bgt-amt"><span class="bgt-cur">'+sym()+'</span><input class="bgt-in bgt-money" inputmode="decimal" placeholder="0" data-cat="'+cat+'" data-id="'+i.id+'" data-field="amount" value="'+esc(i.amount)+'"></div>';
-  if(showShare){
-    html += '<div class="bgt-share" title="Your % of the bill after the fixed extra"><input class="bgt-in bgt-pct" inputmode="decimal" placeholder="50" data-cat="'+cat+'" data-id="'+i.id+'" data-field="sharePct" value="'+esc(i.sharePct)+'"><span class="bgt-pctmark">%</span></div>';
-    html += '<div class="bgt-extra" title="Amount you always pay on top — the rest is split by the % above"><span class="bgt-pctmark">+</span><span class="bgt-cur">'+sym()+'</span><input class="bgt-in bgt-money bgt-extrain" inputmode="decimal" placeholder="0" data-cat="'+cat+'" data-id="'+i.id+'" data-field="extra" value="'+esc(i.extra||"")+'"></div>';
-    html += '<span class="bgt-yourshare" data-id="'+i.id+'" title="Your calculated part">= '+fmt(sharedPart(i))+'</span>';
-  }
-  if(!isIncome && cat!=="shared"){
-    html += '<select class="bgt-acct" data-cat="'+cat+'" data-id="'+i.id+'" data-field="account" title="Transfer this to…">'
-      + ACCOUNTS.map(function(a){ return '<option value="'+esc(a.name)+'"'+(a.name===i.account?" selected":"")+'>'+esc(a.name)+'</option>'; }).join("")
-      + '</select>';
-  }
-  html += '<button class="bgt-del" data-action="del" data-cat="'+cat+'" data-id="'+i.id+'" title="Remove">'+ic("trash")+'</button>';
-  html += '</div>';
-  return html;
-}
-
-function renderLines(){
-  var rl = $("#rolloverList"); var rhtml = "";
-  var ro = rolloverObj(state.data);
-  ROLLOVER_ACCTS.forEach(function(name){
-    var m = ACCT_BY_NAME[name];
-    rhtml += '<div class="bgt-rollline"><span class="bgt-chip bgt-rollchip" style="background:'+m.soft+';color:'+m.color+'">'+ic(m.icon)+'</span>'
-      + '<span class="bgt-rollname">'+name+'</span>'
-      + '<div class="bgt-amt bgt-rollin"><span class="bgt-cur">'+sym()+'</span><input class="bgt-in bgt-money" inputmode="decimal" placeholder="0" data-acct="'+name+'" value="'+esc(ro[name]||"")+'"></div></div>';
-  });
-  rl.innerHTML = rhtml;
-
-  ["income","fixed","variable","shared","savings"].forEach(function(cat){
-    var box = $("#lines-"+cat); var items = state.data[cat];
-    if(!items.length){ box.innerHTML = '<p class="bgt-empty">No entries yet — add your first line below.</p>'; return; }
-    box.innerHTML = items.map(function(i){ return rowHTML(cat, i); }).join("");
-  });
-
-  var sharedSel = $("#sharedAcctSel");
-  if(sharedSel){ sharedSel.value = (state.data.shared[0] && state.data.shared[0].account) || DEFAULT_ACCT.shared; }
-  var pd = loadMonthRaw(shiftMonth(state.monthKey, -1));
-  var pm = pd ? monthLabel(shiftMonth(state.monthKey,-1)) : "";
-  ["income","fixed","variable","shared","savings"].forEach(function(cat){
-    var btn = document.querySelector('.bgt-copycard[data-cat="'+cat+'"]');
-    if(!btn) return;
-    if(pd && pd[cat] && pd[cat].length){ btn.style.display = ""; btn.title = "Copy these lines from " + pm; }
-    else { btn.style.display = "none"; }
-  });
-}
-
-function updateDerived(){
-  var t = computeTotals(state.data);
-  var over = t.freeBuffer < -0.005;
-  $("#sumAvailable").textContent = fmt(t.available);
-  $("#sumAvailableSub").textContent = fmt(t.income) + " in" + (t.rollover ? (" + " + fmt(t.rollover) + " rolled over") : "");
-  $("#sumAllocated").textContent = fmt(t.totalAllocated);
-  $("#sumRemainLabel").textContent = over ? "Over-allocated" : "Buffer left";
-  var rv = $("#sumRemaining"); rv.textContent = fmt(t.freeBuffer); rv.style.color = over ? "#BC4A33" : "#1F7A5C";
-  $("#sumRemainSub").textContent = over ? "more assigned than available" : "unassigned / free";
-
-  $("#sub-income").textContent = fmt(t.income);
-  $("#sub-fixed").textContent = fmt(t.fixed);
-  $("#sub-variable").textContent = fmt(t.variable);
-  $("#sub-savings").textContent = fmt(t.savings);
-  $("#sub-shared").innerHTML = fmt(t.sharedYou) + '<span class="bgt-subtotal-full">of ' + fmt(t.sharedFull) + ' total</span>';
-  $("#rolloverTotal").textContent = fmt(t.rollover);
-
-  state.data.shared.forEach(function(i){
-    var sp = document.querySelector('.bgt-yourshare[data-id="'+i.id+'"]');
-    if(sp) sp.textContent = "= " + fmt(sharedPart(i));
-  });
-
-  renderSlip(t, over);
-  renderCharts(t);
-}
-
-function renderSlip(t, over){
-  var plan = buildPlan(state.data);
-  var html = "";
-  if(!plan.order.length){
-    html = '<p class="bgt-empty bgt-slip-empty">Add expenses or savings and your transfer plan will appear here.</p>';
-  } else {
-    html += '<p class="bgt-ordersub">In order — routed through Variable Checking so each savings account is touched only once.</p>';
-    html += '<ol class="bgt-orderlist">';
-    plan.order.forEach(function(o, i){
-      var col = o.meta ? o.meta.color : "#E7E1D4";
-      html += '<li class="bgt-orderstep" style="border-left-color:'+col+'"><span class="bgt-ordernum">'+(i+1)+'</span>'
-        + '<span class="bgt-orderbody"><span class="bgt-orderflow"><span class="bgt-orderfrom">'+esc(o.from)+'</span>'
-        + '<span class="bgt-orderarrow">'+ic("arrowR")+'</span>'
-        + '<span class="bgt-orderto" style="color:'+col+'">'+esc(o.to)+'</span></span>'
-        + (o.note ? '<span class="bgt-ordernote">'+esc(o.note)+'</span>' : "")
-        + '</span><span class="bgt-orderamt">'+fmt(o.amount)+'</span></li>';
-    });
-    html += '</ol>';
-    html += '<div class="bgt-slip-total"><span>Leaves Short Term Savings</span><span class="bgt-slip-totamt">'+fmt(plan.staging>0?plan.staging:0)+'</span></div>';
-    var keep;
-    if(over){
-      keep = ic("warn") + " Over-allocated by " + fmt(-t.freeBuffer) + " — trim allocations, add income, or pull from Long Term Savings.";
-    } else if(t.hubAllocated > 0.005){
-      keep = fmt(t.remaining) + " stays in Short Term Savings: " + fmt(t.hubAllocated) + " set aside for savings goals, " + fmt(t.freeBuffer) + " free buffer. Variable Checking keeps " + fmt(plan.stageKeep) + ".";
-    } else {
-      keep = fmt(t.freeBuffer) + " free buffer stays in Short Term Savings. Variable Checking keeps " + fmt(plan.stageKeep) + ".";
-    }
-    html += '<div class="bgt-slip-keep" style="color:'+(over?"#BC4A33":"#16243B")+'">' + keep + '</div>';
-  }
-  $("#slipBody").innerHTML = html;
-  $("#slipMonth").textContent = monthLabel(state.monthKey);
-}
-
-function donutSVG(segs, total){
-  var cx=75, cy=75, r=54, sw=20, circ=2*Math.PI*r, off=0, parts="";
-  segs.forEach(function(s){
-    var len = total>0 ? (s.v/total)*circ : 0;
-    parts += '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+s.c+'" stroke-width="'+sw+'" stroke-dasharray="'+len.toFixed(2)+' '+(circ-len).toFixed(2)+'" stroke-dashoffset="'+(-off).toFixed(2)+'" transform="rotate(-90 '+cx+' '+cy+')"></circle>';
-    off += len;
-  });
-  return '<svg viewBox="0 0 150 150" width="150" height="150" style="display:block;margin:0 auto">'+parts+'</svg>';
-}
-function barSVG(available, segs){
-  var W=300, H=180, base=H-26, top=14, plotH=base-top, colW=70, x1=58, x2=176;
-  var alloc = segs.reduce(function(s,x){ return s+x.v; }, 0);
-  var max = Math.max(available, alloc, 1), sc = plotH/max, svg = "";
-  svg += '<line x1="20" y1="'+base+'" x2="'+(W-20)+'" y2="'+base+'" stroke="#E7E1D4"></line>';
-  var h1 = available*sc;
-  svg += '<rect x="'+x1+'" y="'+(base-h1).toFixed(1)+'" width="'+colW+'" height="'+h1.toFixed(1)+'" rx="4" fill="#1F7A5C"></rect>';
-  var y = base;
-  segs.forEach(function(s){ var hh = s.v*sc; if(hh>0.4){ y -= hh; svg += '<rect x="'+x2+'" y="'+y.toFixed(1)+'" width="'+colW+'" height="'+hh.toFixed(1)+'" fill="'+s.c+'"></rect>'; } });
-  svg += '<text x="'+(x1+colW/2)+'" y="'+(base+16)+'" text-anchor="middle" font-size="11" fill="#5C6A80" font-family="Inter,sans-serif">Money in</text>';
-  svg += '<text x="'+(x2+colW/2)+'" y="'+(base+16)+'" text-anchor="middle" font-size="11" fill="#5C6A80" font-family="Inter,sans-serif">Allocated</text>';
-  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'">'+svg+'</svg>';
-}
-function renderCharts(t){
-  var pie = [
-    { n:"Fixed", v:t.fixed, c:CAT.fixed.color },
-    { n:"Variable", v:t.variable, c:CAT.variable.color },
-    { n:"Shared (you)", v:t.sharedYou, c:CAT.shared.color },
-    { n:"Savings", v:t.savings, c:CAT.savings.color }
-  ].filter(function(s){ return s.v>0; });
-  var total = pie.reduce(function(s,x){ return s+x.v; }, 0);
-  $("#pieWrap").innerHTML = total>0 ? donutSVG(pie, total) : '<p class="bgt-empty">Add expenses to see the breakdown.</p>';
-  $("#pieLegend").innerHTML = pie.map(function(s){ return '<li><span class="bgt-dot" style="background:'+s.c+'"></span>'+s.n+'<b>'+fmt(s.v)+'</b></li>'; }).join("");
-
-  var g = grossByAccount(state.data);
-  var totalBuffer = ACCOUNTS.reduce(function(s,a){ return (a.buffer && g[a.name]>0) ? s+a.buffer : s; }, 0);
-  var segs = [
-    { v:t.fixed, c:CAT.fixed.color }, { v:t.variable, c:CAT.variable.color },
-    { v:t.sharedYou, c:CAT.shared.color }, { v:Math.max(0,t.savings), c:CAT.savings.color },
-    { v:totalBuffer, c:"#9AA3B2" }
+  const rows = [
+    ['group', 'Base'],
+    ['row',
+      'Seed-starting mix<div class="hint">Pro-Mix BX or similar pro-grade</div>',
+      num(mixCuft) + ' cu ft',
+      num(mixCuft / BALE_CUFT) + ' bale · ' + volAlt(mixCuft)],
+    ['row',
+      'Finished screened compost<div class="hint">SeaCoast or any high-quality compost</div>',
+      num(compCuft / GAL_CUFT, 1) + ' gal',
+      num(compCuft / 5 / GAL_CUFT, 2) + ' × 5-gal bucket · ' + num(compCuft) + ' cu ft'],
+    ['group', 'Amendments'],
+    ['row', 'Bonemeal', cupsText(BASE.bonemeal * s), '≈ ' + num(BASE.bonemeal * s * LB_PER_CUP.bonemeal, 2) + ' lb'],
+    ['row', 'Kelp meal', cupsText(BASE.kelp * s), '≈ ' + num(BASE.kelp * s * LB_PER_CUP.kelp, 2) + ' lb'],
+    ['row', 'Blood meal', cupsText(BASE.blood * s), '≈ ' + num(BASE.blood * s * LB_PER_CUP.blood, 2) + ' lb']
   ];
-  $("#barWrap").innerHTML = barSVG(t.available, segs);
+
+  document.getElementById('out').innerHTML = s === 0
+    ? '<tr><td colspan="3" class="alt">Enter an amount above to see your recipe.</td></tr>'
+    : rows.map(r => r[0] === 'group'
+        ? `<tr class="group"><td colspan="3">${r[1]}</td></tr>`
+        : `<tr><td>${r[1]}</td><td class="amt">${r[2]}</td><td class="alt">${r[3]}</td></tr>`
+      ).join('');
 }
 
-/* ============================================================
-   Minimal in-browser .xlsx reader
-   Uses only native browser APIs (DecompressionStream, TextDecoder).
-   No libraries, no uploads — the file never leaves the machine.
-   ============================================================ */
-
-/* --- ZIP: locate End Of Central Directory, walk central directory --- */
-function zipEntries(buf){
-  var dv = new DataView(buf), u8 = new Uint8Array(buf);
-  /* find EOCD signature 0x06054b50 scanning backwards */
-  var eocd = -1;
-  for(var i = u8.length - 22; i >= 0 && i > u8.length - 22 - 65558; i--){
-    if(dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
-  }
-  if(eocd < 0) throw new Error("Not a valid .xlsx file (no ZIP end record).");
-  var count = dv.getUint16(eocd + 10, true);
-  var cdOffset = dv.getUint32(eocd + 16, true);
-  var entries = {}, p = cdOffset;
-  for(var n = 0; n < count; n++){
-    if(dv.getUint32(p, true) !== 0x02014b50) break;
-    var method   = dv.getUint16(p + 10, true);
-    var compSize = dv.getUint32(p + 20, true);
-    var nameLen  = dv.getUint16(p + 28, true);
-    var extraLen = dv.getUint16(p + 30, true);
-    var cmtLen   = dv.getUint16(p + 32, true);
-    var localOff = dv.getUint32(p + 42, true);
-    var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nameLen));
-    entries[name] = { method:method, compSize:compSize, localOff:localOff };
-    p += 46 + nameLen + extraLen + cmtLen;
-  }
-  return entries;
-}
-
-/* Read one entry's bytes. NOTE: the local header's own name/extra lengths
-   must be used — they can differ from the central directory's. */
-async function zipRead(buf, entry){
-  var dv = new DataView(buf), u8 = new Uint8Array(buf);
-  var lo = entry.localOff;
-  if(dv.getUint32(lo, true) !== 0x04034b50) throw new Error("Corrupt ZIP entry.");
-  var nameLen  = dv.getUint16(lo + 26, true);
-  var extraLen = dv.getUint16(lo + 28, true);
-  var start = lo + 30 + nameLen + extraLen;
-  var data = u8.subarray(start, start + entry.compSize);
-  if(entry.method === 0) return new TextDecoder().decode(data);        /* stored */
-  if(entry.method !== 8) throw new Error("Unsupported compression in .xlsx.");
-  var ds = new DecompressionStream("deflate-raw");                      /* raw, not zlib */
-  var stream = new Blob([data]).stream().pipeThrough(ds);
-  return await new Response(stream).text();
-}
-
-/* --- XML helpers --- */
-function xmlDoc(text){
-  return new DOMParser().parseFromString(text, "application/xml");
-}
-function colToIndex(ref){                 /* "AB12" -> 28 (1-based column) */
-  var m = /^([A-Z]+)/.exec(ref); if(!m) return 0;
-  var s = m[1], n = 0;
-  for(var i = 0; i < s.length; i++) n = n * 26 + (s.charCodeAt(i) - 64);
-  return n;
-}
-function rowOf(ref){ var m = /(\d+)$/.exec(ref); return m ? parseInt(m[1], 10) : 0; }
-
-/* --- read a whole sheet into rows[rowNum][colNum] = value --- */
-async function readSheetGrid(buf, entries, sheetName){
-  var wbXml   = xmlDoc(await zipRead(buf, entries["xl/workbook.xml"]));
-  var relsXml = xmlDoc(await zipRead(buf, entries["xl/_rels/workbook.xml.rels"]));
-
-  var relTarget = {};
-  var rels = relsXml.getElementsByTagName("Relationship");
-  for(var i = 0; i < rels.length; i++){
-    relTarget[rels[i].getAttribute("Id")] = rels[i].getAttribute("Target");
-  }
-
-  var target = null, names = [];
-  var sheets = wbXml.getElementsByTagName("sheet");
-  for(var j = 0; j < sheets.length; j++){
-    var nm = sheets[j].getAttribute("name");
-    names.push(nm);
-    if(nm === sheetName){
-      var rid = sheets[j].getAttribute("r:id") || sheets[j].getAttribute("id");
-      target = relTarget[rid];
-    }
-  }
-  if(!target) return { grid:null, sheetNames:names };
-
-  var path = target.indexOf("/") === 0 ? target.slice(1)
-           : (target.indexOf("xl/") === 0 ? target : "xl/" + target);
-  if(!entries[path]) return { grid:null, sheetNames:names };
-
-  /* shared strings table (cells with t="s" hold an index into this) */
-  var shared = [];
-  if(entries["xl/sharedStrings.xml"]){
-    var ssXml = xmlDoc(await zipRead(buf, entries["xl/sharedStrings.xml"]));
-    var sis = ssXml.getElementsByTagName("si");
-    for(var k = 0; k < sis.length; k++){
-      var ts = sis[k].getElementsByTagName("t"), s = "";
-      for(var t = 0; t < ts.length; t++) s += ts[t].textContent;
-      shared.push(s);
-    }
-  }
-
-  var shXml = xmlDoc(await zipRead(buf, entries[path]));
-  var cells = shXml.getElementsByTagName("c");
-  var grid = {};
-  for(var c = 0; c < cells.length; c++){
-    var cell = cells[c], ref = cell.getAttribute("r");
-    if(!ref) continue;
-    var type = cell.getAttribute("t");
-    var val;
-    if(type === "inlineStr"){
-      var isNode = cell.getElementsByTagName("t");
-      val = isNode.length ? isNode[0].textContent : "";
-    } else {
-      var vNode = cell.getElementsByTagName("v");
-      if(!vNode.length) continue;
-      var raw = vNode[0].textContent;
-      if(type === "s")      val = shared[parseInt(raw, 10)];
-      else if(type === "e") continue;                 /* error cell — skip */
-      else if(type === "str") val = raw;
-      else                  val = parseFloat(raw);
-    }
-    var r = rowOf(ref), ci = colToIndex(ref);
-    if(!grid[r]) grid[r] = {};
-    grid[r][ci] = val;
-  }
-  return { grid:grid, sheetNames:names };
-}
-
-/* --- interpret the grid as {expenseName: amount} for a given month --- */
-var MONTH_NAMES = ["january","february","march","april","may","june",
-                   "july","august","september","october","november","december"];
-
-function extractMonth(grid, monthIndex /* 0-11 */){
-  /* 1. find the header row that contains month names, and which column holds our month */
-  var headerRow = null, monthCol = null;
-  var rowNums = Object.keys(grid).map(Number).sort(function(a,b){ return a-b; });
-  for(var i = 0; i < rowNums.length; i++){
-    var row = grid[rowNums[i]], hits = 0, foundCol = null;
-    for(var col in row){
-      var v = row[col];
-      if(typeof v === "string"){
-        var idx = MONTH_NAMES.indexOf(v.trim().toLowerCase());
-        if(idx >= 0){ hits++; if(idx === monthIndex) foundCol = Number(col); }
-      }
-    }
-    if(hits >= 6){ headerRow = rowNums[i]; monthCol = foundCol; break; }
-  }
-  if(headerRow === null) throw new Error("Could not find a month header row in that sheet.");
-  if(monthCol === null)  throw new Error("That sheet has no column for the selected month.");
-
-  /* 2. walk rows below the header, reading label (col A) + amount (month col),
-        stopping at the Total row. Rows whose label ends in '*' are components
-        of a card balance already counted elsewhere, so they're skipped. */
-  var out = {}, skipped = [];
-  for(var j = 0; j < rowNums.length; j++){
-    var rn = rowNums[j];
-    if(rn <= headerRow) continue;
-    var row = grid[rn];
-    var label = row[1];
-    if(typeof label !== "string" || !label.trim()) continue;
-    label = label.trim();
-
-    var lower = label.toLowerCase();
-    if(lower === "total" || lower.indexOf("total ") === 0) break;   /* end of the block */
-
-    if(/\*\s*$/.test(label) || label.indexOf("*") >= 0){ skipped.push(label); continue; }
-    if(lower.indexOf("owed to") === 0) continue;
-
-    var amt = row[monthCol];
-    if(typeof amt !== "number" || !isFinite(amt) || amt === 0) continue;
-    out[label] = Math.round(amt * 100) / 100;
-  }
-  return { data:out, skipped:skipped };
-}
-
-/* --- top-level: File -> {expenseName: amount} for monthKey "YYYY-MM" --- */
-async function readSharedExpensesFromXlsx(file, monthKey){
-  var buf = await file.arrayBuffer();
-  var entries = zipEntries(buf);
-  if(!entries["xl/workbook.xml"]) throw new Error("That file doesn't look like an Excel workbook.");
-
-  var parts = monthKey.split("-");
-  var year = parts[0], monthIndex = parseInt(parts[1], 10) - 1;
-
-  var res = await readSheetGrid(buf, entries, year);
-  if(!res.grid){
-    throw new Error("No sheet named “" + year + "” in that workbook. Sheets found: "
-                    + res.sheetNames.join(", "));
-  }
-  return extractMonth(res.grid, monthIndex);
-}
-
-/* ============================================================
-   Sync: one JSON file in a private GitHub repo.
-   localStorage is the working copy; the file is the exchange medium.
-
-   Three storage keys, deliberately kept apart:
-     budget:m:*     the data itself   (this is what travels)
-     budget:sync    repo config + rev bookkeeping   (never travels)
-     budget:token   the access token  (never travels, never exported)
-   ============================================================ */
-
-var SYNC_KEY = "budget:sync", TOKEN_KEY = "budget:token";
-
-function loadSyncCfg(){
-  var d = { owner:"", repo:"", path:"budget-data.json", sharedPath:"expenses.json", branch:"main",
-            people:[], meId:"",
-            rev:0, baseRev:0, modified:"", device:"", auto:false };
-  try {
-    var s = JSON.parse(lsGet(SYNC_KEY) || "{}");
-    for(var k in s) d[k] = s[k];
-  } catch(e){}
-  if(!d.device) d.device = makeDeviceName();
-  return d;
-}
-function saveSyncCfg(c){ lsSet(SYNC_KEY, JSON.stringify(c)); }
-function getToken(){ return lsGet(TOKEN_KEY) || ""; }
-function setToken(t){ if(t) lsSet(TOKEN_KEY, t); else lsDel(TOKEN_KEY); }
-
-function makeDeviceName(){
-  var p = navigator.platform || "Device";
-  var os = /Mac/i.test(p) ? "Mac" : /Win/i.test(p) ? "Windows" : /Linux/i.test(p) ? "Linux"
-         : /iPhone|iPad/i.test(navigator.userAgent||"") ? "iOS" : "Device";
-  return os + " · " + Math.random().toString(36).slice(2,5);
-}
-
-/* every meaningful edit advances the revision */
-function bumpRev(){
-  var c = loadSyncCfg();
-  c.rev = (c.rev || 0) + 1;
-  c.modified = new Date().toISOString();
-  saveSyncCfg(c);
-}
-function hasLocalEdits(){ var c = loadSyncCfg(); return (c.rev || 0) > (c.baseRev || 0); }
-
-/* ---- the payload that travels ---- */
-function buildPayload(){
-  var c = loadSyncCfg();
-  var months = {};
-  allMonthKeys().forEach(function(k){ var d = loadMonthRaw(k); if(d) months[k] = d; });
-  months[state.monthKey] = state.data;
-  return {
-    app:"monthly-budget", version:1,
-    exportedAt:new Date().toISOString(),
-    currency:state.currency,
-    months:months,
-    sync:{ rev:c.rev || 0, modified:c.modified || new Date().toISOString(), device:c.device }
-  };
-}
-function describePayload(p){
-  var months = Object.keys(p.months || {});
-  var filled = months.filter(function(k){
-    var m = p.months[k], cats = ["income","fixed","variable","shared","savings"];
-    return cats.some(function(c){ return (m[c]||[]).some(function(i){ return num(i.amount) !== 0; }); });
-  });
-  var lines = 0;
-  months.forEach(function(k){
-    ["income","fixed","variable","shared","savings"].forEach(function(c){
-      lines += (p.months[k][c] || []).length;
-    });
-  });
-  return months.length + " months, " + filled.length + " with figures, " + lines + " lines";
-}
-
-/* ---- base64 that survives non-ASCII, and GitHub's newline wrapping ---- */
-function b64encode(s){
-  var bin = "", bytes = new TextEncoder().encode(s);
-  for(var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin);
-}
-function b64decode(s){
-  var clean = String(s).replace(/\s/g, "");
-  return new TextDecoder().decode(Uint8Array.from(atob(clean), function(c){ return c.charCodeAt(0); }));
-}
-
-/* ---- GitHub Contents API ---- */
-function ghHeaders(){
-  return { "Authorization":"Bearer " + getToken(),
-           "Accept":"application/vnd.github+json",
-           "X-GitHub-Api-Version":"2022-11-28" };
-}
-function ghContentsUrl(c){
-  return "https://api.github.com/repos/" + encodeURIComponent(c.owner) + "/"
-       + encodeURIComponent(c.repo) + "/contents/"
-       + c.path.split("/").map(encodeURIComponent).join("/");
-}
-
-/* Map status codes to something a person can act on. */
-function ghError(status, body){
-  if(status === 401) return "Token rejected — it may be expired, revoked, or mistyped.";
-  if(status === 403){
-    if(/rate limit/i.test(body||"")) return "GitHub rate limit reached. Wait a minute and try again.";
-    return "Token lacks permission. It needs Contents: Read and write on this repository.";
-  }
-  if(status === 409 || status === 422) return "The file changed while writing. Pull the latest copy first.";
-  return "GitHub returned " + status + ". " + (body || "").slice(0, 200);
-}
-
-async function ghRead(c){
-  var url = ghContentsUrl(c) + "?ref=" + encodeURIComponent(c.branch);
-  var res = await fetch(url, { headers:ghHeaders() });
-
-  if(res.status === 404){
-    /* 404 is ambiguous: the file may not exist, or the token may not be able
-       to see the repo at all — private repos are hidden, not forbidden.
-       Probe the repo itself to tell the two apart. */
-    var probe = await fetch("https://api.github.com/repos/" + encodeURIComponent(c.owner)
-                            + "/" + encodeURIComponent(c.repo), { headers:ghHeaders() });
-    if(probe.ok) return { missing:true };
-    if(probe.status === 401) throw new Error(ghError(401));
-    throw new Error("Can't see " + c.owner + "/" + c.repo
-                    + " — check the names, or the token has no access to it.");
-  }
-  if(!res.ok) throw new Error(ghError(res.status, await res.text()));
-
-  var j = await res.json();
-  var payload;
-  try { payload = JSON.parse(b64decode(j.content)); }
-  catch(e){ throw new Error("The file in that repo isn't valid budget JSON."); }
-  return { payload:payload, sha:j.sha };
-}
-
-async function ghWrite(c, payload, sha, message){
-  /* The shared-expenses file belongs to another application. Nothing in this
-     app may write to it — enforced here so no future call site can slip past. */
-  var guard = loadSyncCfg();
-  if(c.path && guard.sharedPath && c.path === guard.sharedPath){
-    throw new Error("Refusing to write " + c.path + " — that file is read-only for this app.");
-  }
-  var body = { message:message || ("budget: update from " + c.device),
-               content:b64encode(JSON.stringify(payload, null, 2)),
-               branch:c.branch };
-  if(sha) body.sha = sha;           /* omitted on create; required on update */
-  var res = await fetch(ghContentsUrl(c), {
-    method:"PUT", headers:ghHeaders(), body:JSON.stringify(body)
-  });
-  if(!res.ok) throw new Error(ghError(res.status, await res.text()));
-  return await res.json();
-}
-
-/* ---- the four-way decision ---- */
-function compareRevs(remoteRev, cfg){
-  var base = cfg.baseRev || 0, local = cfg.rev || 0;
-  var pending = local > base;
-  if(remoteRev > base && pending)  return "conflict";
-  if(remoteRev > base && !pending) return "adopt-remote";
-  if(remoteRev <= base && pending) return "push-needed";
-  return "up-to-date";
-}
-
-function applyPayload(p){
-  allMonthKeys().forEach(function(k){ lsDel("budget:m:"+k); });
-  Object.keys(p.months || {}).forEach(function(k){
-    try { lsSet("budget:m:"+k, JSON.stringify(p.months[k])); } catch(e){}
-  });
-  if(p.currency){ state.currency = p.currency; saveCurrency(state.currency); fmtCache = {}; }
-  var keys = Object.keys(p.months || {});
-  if(keys.indexOf(state.monthKey) < 0 && keys.length){ keys.sort(); state.monthKey = keys[keys.length-1]; }
-  state.data = getMonth(state.monthKey);
-  var sel = $("#currencySel"); if(sel) sel.value = state.currency;
-  var lbl = $("#monthLabel"); if(lbl) lbl.textContent = monthLabel(state.monthKey);
-  renderLines(); updateDerived();
-}
-
-function requireConfig(){
-  var c = loadSyncCfg();
-  if(!c.owner || !c.repo || !c.path){ openSyncPanel(); setStatus("Set the repo first"); return null; }
-  if(!getToken()){ openSyncPanel(); setStatus("Add a token first"); return null; }
-  return c;
-}
-
-/* ---- pull ---- */
-async function syncPull(force){
-  var c = requireConfig(); if(!c) return;
-  setStatus("Checking…");
-  var r;
-  try { r = await ghRead(c); }
-  catch(e){ setStatus("Sync failed"); alert(e.message); return; }
-
-  if(r.missing){ setStatus("Nothing saved in that repo yet — push first."); return; }
-
-  var remoteRev = (r.payload.sync && r.payload.sync.rev) || 0;
-  var verdict = force ? "adopt-remote" : compareRevs(remoteRev, c);
-
-  if(verdict === "conflict"){ showConflict(r.payload, r.sha, "pull"); return; }
-  if(verdict === "push-needed"){ setStatus("This copy is ahead — push instead."); return; }
-  if(verdict === "up-to-date"){ setStatus("Already up to date"); return; }
-
-  applyPayload(r.payload);
-  c.rev = remoteRev; c.baseRev = remoteRev;
-  c.modified = (r.payload.sync && r.payload.sync.modified) || new Date().toISOString();
-  saveSyncCfg(c);
-  setStatus("Pulled " + describePayload(r.payload));
-}
-
-/* ---- push ---- */
-async function syncPush(force){
-  var c = requireConfig(); if(!c) return;
-  saveNow();
-  setStatus("Checking…");
-  var r;
-  try { r = await ghRead(c); }
-  catch(e){ setStatus("Sync failed"); alert(e.message); return; }
-
-  var sha = r.missing ? null : r.sha;
-  if(!r.missing && !force){
-    var remoteRev = (r.payload.sync && r.payload.sync.rev) || 0;
-    var verdict = compareRevs(remoteRev, c);
-    if(verdict === "conflict"){ showConflict(r.payload, r.sha, "push"); return; }
-    if(verdict === "adopt-remote"){ setStatus("Remote is newer — pull first."); return; }
-    if(verdict === "up-to-date"){ setStatus("Nothing to push"); return; }
-  }
-
-  var payload = buildPayload();
-  setStatus("Pushing…");
-  try { await ghWrite(c, payload, sha); }
-  catch(e){ setStatus("Push failed"); alert(e.message); return; }
-
-  var c2 = loadSyncCfg();
-  c2.baseRev = payload.sync.rev;
-  c2.modified = payload.sync.modified;
-  saveSyncCfg(c2);
-  setStatus("Pushed " + describePayload(payload));
-}
-
-/* ---- conflict: block the write, show both, back up the loser ---- */
-var pendingConflict = null;
-function showConflict(remotePayload, sha, origin){
-  pendingConflict = { remote:remotePayload, sha:sha, origin:origin };
-  var c = loadSyncCfg();
-  var mine = buildPayload();
-  var rs = remotePayload.sync || {};
-  var el = $("#conflictBody");
-  el.innerHTML =
-      '<p class="bgt-ordersub">Both copies changed since they last matched. Nothing has been'
-    + ' overwritten. Choose which to keep — the other is downloaded as a backup first.</p>'
-    + '<div class="bgt-cflist">'
-    +   '<div class="bgt-cfcard"><h4>This device</h4>'
-    +     '<div class="bgt-cfmeta">' + esc(c.device) + '</div>'
-    +     '<div class="bgt-cfmeta">' + esc(fmtWhen(mine.sync.modified)) + '</div>'
-    +     '<div class="bgt-cfmeta">rev ' + mine.sync.rev + '</div>'
-    +     '<div class="bgt-cfsum">' + esc(describePayload(mine)) + '</div>'
-    +     '<button class="bgt-btn" data-action="cf-mine">Keep this device’s copy</button></div>'
-    +   '<div class="bgt-cfcard"><h4>In the repo</h4>'
-    +     '<div class="bgt-cfmeta">' + esc(rs.device || "unknown device") + '</div>'
-    +     '<div class="bgt-cfmeta">' + esc(fmtWhen(rs.modified)) + '</div>'
-    +     '<div class="bgt-cfmeta">rev ' + (rs.rev || 0) + '</div>'
-    +     '<div class="bgt-cfsum">' + esc(describePayload(remotePayload)) + '</div>'
-    +     '<button class="bgt-btn" data-action="cf-remote">Keep the repo’s copy</button></div>'
-    + '</div>';
-  $("#conflictWrap").style.display = "flex";
-  setStatus("Conflict — nothing overwritten");
-}
-function fmtWhen(iso){
-  if(!iso) return "unknown time";
-  try { return new Date(iso).toLocaleString(); } catch(e){ return iso; }
-}
-function closeConflict(){ $("#conflictWrap").style.display = "none"; pendingConflict = null; }
-
-async function resolveConflict(keep){
-  if(!pendingConflict) return;
-  var pc = pendingConflict, c = loadSyncCfg();
-  var stamp = new Date().toISOString().slice(0,10);
-  if(keep === "mine"){
-    /* back up the copy being discarded, then overwrite it */
-    download("budget-backup-repo-" + stamp + ".json", JSON.stringify(pc.remote, null, 2));
-    var payload = buildPayload();
-    setStatus("Pushing…");
-    try { await ghWrite(c, payload, pc.sha, "budget: resolve conflict, keep " + c.device); }
-    catch(e){ setStatus("Push failed"); alert(e.message); return; }
-    var c2 = loadSyncCfg(); c2.baseRev = payload.sync.rev; saveSyncCfg(c2);
-    setStatus("Kept this device’s copy");
-  } else {
-    download("budget-backup-local-" + stamp + ".json", JSON.stringify(buildPayload(), null, 2));
-    applyPayload(pc.remote);
-    var rr = (pc.remote.sync && pc.remote.sync.rev) || 0;
-    var c3 = loadSyncCfg(); c3.rev = rr; c3.baseRev = rr; saveSyncCfg(c3);
-    setStatus("Kept the repo’s copy");
-  }
-  closeConflict();
-}
-
-/* ---- settings panel ---- */
-function onSharedPagesOrigin(){ return /\.github\.io$/i.test(location.hostname); }
-
-function openSyncPanel(){
-  var c = loadSyncCfg();
-  $("#syncOwner").value  = c.owner;
-  $("#syncRepo").value   = c.repo;
-  $("#syncPath").value   = c.path;
-  $("#syncBranch").value = c.branch;
-  $("#syncShared").value = sharedPathOf(c);
-  var meSel = $("#syncMe"), ppl = c.people || [];
-  meSel.innerHTML = ppl.length
-    ? ppl.map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===c.meId?" selected":"")+'>'+esc(p.name||p.id)+'</option>'; }).join("")
-    : '<option value="">(load shared expenses once)</option>';
-  $("#syncToken").value  = getToken();
-  $("#syncAuto").checked = !!c.auto;
-  $("#syncWarn").style.display = onSharedPagesOrigin() ? "" : "none";
-  $("#syncState").textContent =
-      "rev " + (c.rev||0) + " here, last exchanged at rev " + (c.baseRev||0)
-    + (hasLocalEdits() ? " — unpushed changes" : " — nothing pending");
-  $("#syncWrap").style.display = "flex";
-}
-function closeSyncPanel(){ $("#syncWrap").style.display = "none"; }
-function saveSyncPanel(){
-  var c = loadSyncCfg();
-  c.owner  = $("#syncOwner").value.trim();
-  c.repo   = $("#syncRepo").value.trim();
-  c.path   = $("#syncPath").value.trim() || "budget-data.json";
-  c.branch = $("#syncBranch").value.trim() || "main";
-  c.sharedPath = $("#syncShared").value.trim() || "expenses.json";
-  var meVal = $("#syncMe").value; if(meVal) c.meId = meVal;
-  c.auto   = $("#syncAuto").checked;
-  saveSyncCfg(c);
-  setToken($("#syncToken").value.trim());
-  closeSyncPanel();
-  setStatus("Sync settings saved");
-}
-function forgetToken(){
-  setToken("");
-  $("#syncToken").value = "";
-  setStatus("Token removed from this browser");
-}
-
-/* ----------------------------- actions --------------------------- */
-var saveTimer = null;
-function setStatus(s){ var e = $("#saveStatus"); if(e) e.textContent = s; }
-function scheduleSave(){
-  setStatus("Saving\u2026");
-  if(saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(function(){ flushSave(); maybeAutoPush(); }, 400);
-}
-function saveNow(){ flushSave(); }
-
-/* A debounced save is lost if the tab closes inside the debounce window,
-   so this path is also called on the way out. */
-function flushSave(){
-  if(saveTimer){ clearTimeout(saveTimer); saveTimer = null; }
-  /* Advance the revision only when the stored bytes actually change.
-     Saving is called on many paths (including before a push), and a rev
-     that moves without an edit would make this copy look permanently
-     ahead of the repo. */
-  var before = lsGet("budget:m:" + state.monthKey);
-  saveMonth(state.monthKey, state.data);
-  var after = lsGet("budget:m:" + state.monthKey);
-  if(before !== after) bumpRev();
-  setStatus("All changes saved");
-}
-var autoPushTimer = null;
-function maybeAutoPush(){
-  var c = loadSyncCfg();
-  if(!c.auto || !c.owner || !c.repo || !getToken()) return;
-  if(autoPushTimer) clearTimeout(autoPushTimer);
-  autoPushTimer = setTimeout(function(){ syncPush(); }, 2500);
-}
-
-function findItem(cat, id){ var a = state.data[cat]; for(var i=0;i<a.length;i++){ if(a[i].id===id) return a[i]; } return null; }
-
-function navMonth(delta){
-  saveNow();
-  state.monthKey = shiftMonth(state.monthKey, delta);
-  state.data = getMonth(state.monthKey);
-  $("#monthLabel").textContent = monthLabel(state.monthKey);
-  renderLines(); updateDerived();
-}
-var RESET_AMOUNT = { income:true, variable:true, shared:true };
-
-/* Split rules are remembered per expense name, so an import never has to
-   re-learn them. Nothing personal is hardcoded — the app stores what you set. */
-function loadSplits(){
-  try { return JSON.parse(lsGet("budget:splits") || "{}"); } catch(e){ return {}; }
-}
-function saveSplit(name, pct, extra){
-  if(!name) return;
-  var m = loadSplits();
-  m[name] = { pct:String(pct == null ? "50" : pct), extra:String(extra || "") };
-  lsSet("budget:splits", JSON.stringify(m));
-}
-function splitSettingsFor(name){
-  var here = state.data.shared || [];
-  for(var i = 0; i < here.length; i++){
-    if(here[i].name === name) return { pct:here[i].sharePct, extra:here[i].extra || "" };
-  }
-  var saved = loadSplits()[name];
-  if(saved) return { pct:saved.pct, extra:saved.extra };
-  var prev = loadMonthRaw(shiftMonth(state.monthKey, -1));
-  if(prev && prev.shared){
-    for(var j = 0; j < prev.shared.length; j++){
-      if(prev.shared[j].name === name){
-        return { pct:prev.shared[j].sharePct, extra:prev.shared[j].extra || "" };
-      }
-    }
-  }
-  return { pct:"50", extra:"" };
-}
-
-/* ---- shared expenses: read-only, from the household-expense file ---- */
-function sharedPathOf(c){ return (c.sharedPath || "expenses.json"); }
-
-async function ghReadPath(c, path){
-  var cc = {}; for(var k in c) cc[k] = c[k];
-  cc.path = path;
-  return await ghRead(cc);
-}
-
-/* The file is produced by a separate household app. Its shape:
-     years -> "2026" -> categories[] -> { name, kind, onCard, split, amounts:{"1".."12"} }
-   Rules:
-     onCard set        -> the charge sits inside a card statement already listed; skip it
-     split.mode "even" -> halved
-     split.mode "solo" -> all of it, or none, depending whose it is           */
-function extractHousehold(doc, monthKey, meId){
-  var parts = monthKey.split("-");
-  var year = parts[0], month = String(parseInt(parts[1], 10));
-
-  var yr = doc.years && doc.years[year];
-  if(!yr) return { data:{}, splits:{}, skipped:[], noYear:true };
-
-  var cats = yr.categories || [];
-  var data = {}, splits = {}, skipped = [];
-
-  cats.forEach(function(cat){
-    var name = cat.name;
-    if(!name) return;
-
-    if(cat.onCard){ skipped.push(name); return; }   /* already inside a statement line */
-
-    var amt = cat.amounts && cat.amounts[month];
-    if(typeof amt !== "number" || !isFinite(amt) || amt === 0) return;
-
-    var sp = cat.split || {}, pct = "50";
-    if(sp.mode === "solo")      pct = (sp.personId === meId) ? "100" : "0";
-    else if(sp.mode === "even") pct = "50";
-
-    data[name] = Math.round(amt * 100) / 100;
-    splits[name] = pct;
-  });
-  return { data:data, splits:splits, skipped:skipped };
-}
-
-async function importSharedExpenses(){
-  var c = requireConfig(); if(!c) return;
-  setStatus("Fetching shared expenses\u2026");
-  var r;
-  try { r = await ghReadPath(c, sharedPathOf(c)); }
-  catch(e){ setStatus("Couldn't load shared expenses"); alert(e.message); return; }
-
-  if(r.missing){
-    setStatus("No " + sharedPathOf(c) + " in that repo");
-    alert("There's no " + sharedPathOf(c) + " in " + c.owner + "/" + c.repo + ".");
-    return;
-  }
-
-  var doc = r.payload;
-  if(!doc || !doc.years){
-    setStatus("Unexpected file");
-    alert("That file doesn't look like a household-expense file.\n\nTop-level keys found: "
-          + Object.keys(doc || {}).join(", "));
-    return;
-  }
-
-  /* remember who's who so the split can be resolved without asking each time */
-  if(doc.people && doc.people.length){
-    c.people = doc.people.map(function(p){ return { id:p.id, name:p.name }; });
-    if(!c.meId || !c.people.some(function(p){ return p.id === c.meId; })) c.meId = c.people[0].id;
-    saveSyncCfg(c);
-  }
-
-  var res = extractHousehold(doc, state.monthKey, c.meId);
-  if(res.noYear){
-    setStatus("No " + state.monthKey.split("-")[0] + " in that file");
-    alert("That file has no data for " + state.monthKey.split("-")[0]
-          + ". Years present: " + Object.keys(doc.years).join(", "));
-    return;
-  }
-  var names = Object.keys(res.data);
-  if(!names.length){
-    setStatus("Nothing for " + monthLabel(state.monthKey));
-    alert("No shared expenses recorded for " + monthLabel(state.monthKey) + ".");
-    return;
-  }
-  applySharedData(res.data, res.splits, res.skipped.length);
-}
-
-/* The file is authoritative for the percentage. It has no concept of a fixed
-   amount one person always pays, so that is kept from your own settings. */
-function applySharedData(d, splits, rolledUp){
-  var acct = (state.data.shared[0] && state.data.shared[0].account) || DEFAULT_ACCT.shared;
-  var names = Object.keys(d);
-  state.data.shared = names.map(function(name){
-    var saved = splitSettingsFor(name);
-    var pct = (splits && splits[name] != null) ? splits[name] : saved.pct;
-    return { id:uid(), name:name, amount:String(d[name]),
-             sharePct:pct, extra:saved.extra || "", account:acct };
-  });
-  saveNow(); renderLines(); updateDerived();
-  setStatus("Loaded " + names.length + " for " + monthLabel(state.monthKey)
-            + (rolledUp ? " (" + rolledUp + " card items rolled up)" : ""));
-}
-
-function copyCard(cat){
-  var pd = loadMonthRaw(shiftMonth(state.monthKey, -1));
-  if(!pd || !pd[cat] || !pd[cat].length) return;
-  var reset = !!RESET_AMOUNT[cat];
-  var lines = pd[cat].map(function(x){
-    var o = {}; for(var k in x) o[k]=x[k];
-    o.id = uid();
-    if(reset) o.amount = "";
-    return o;
-  });
-  var copy = {}; for(var k in state.data) copy[k] = state.data[k];
-  copy[cat] = lines;
-  state.data = normalize(copy);
-  saveNow(); renderLines(); updateDerived();
-}
-
-function download(filename, text){
-  var blob = new Blob([text], { type:"application/json" });
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement("a");
-  a.href = url; a.download = filename; document.body.appendChild(a); a.click();
-  document.body.removeChild(a);
-  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
-}
-function exportData(){
-  saveNow();
-  var months = {};
-  allMonthKeys().forEach(function(k){ var d = loadMonthRaw(k); if(d) months[k] = d; });
-  months[state.monthKey] = state.data;
-  var out = { app:"monthly-budget", version:1, exportedAt:new Date().toISOString(), currency:state.currency, months:months };
-  download("budget-export-" + new Date().toISOString().slice(0,10) + ".json", JSON.stringify(out, null, 2));
-  setStatus("Exported");
-}
-function importData(obj){
-  if(!obj || typeof obj!=="object" || !obj.months){ alert("That doesn't look like a budget export file."); return; }
-  if(!window.confirm("Importing will replace the budget data stored in this browser. Continue?")) return;
-  allMonthKeys().forEach(function(k){ lsDel("budget:m:"+k); });
-  Object.keys(obj.months).forEach(function(k){ try { lsSet("budget:m:"+k, JSON.stringify(obj.months[k])); } catch(e){} });
-  if(obj.currency){ state.currency = obj.currency; saveCurrency(state.currency); fmtCache = {}; }
-  var keys = Object.keys(obj.months);
-  if(keys.indexOf(state.monthKey) < 0 && keys.length){ keys.sort(); state.monthKey = keys[keys.length-1]; }
-  state.data = getMonth(state.monthKey);
-  $("#currencySel").value = state.currency;
-  $("#monthLabel").textContent = monthLabel(state.monthKey);
-  renderLines(); updateDerived();
-  setStatus("Imported");
-}
-
-/* ----------------------------- events ---------------------------- */
-function wireEvents(){
-  app.addEventListener("input", function(e){
-    var el = e.target;
-    if(el.dataset && el.dataset.field){
-      var cat = el.dataset.cat, id = el.dataset.id, field = el.dataset.field;
-      var v = el.value;
-      if(field==="amount"){
-        if(cat==="savings"){ v = v.replace(/[^0-9.\-]/g,"").replace(/(?!^)-/g,""); }
-        else { v = v.replace(/[^0-9.]/g,""); }
-      } else if(field==="sharePct" || field==="extra"){ v = v.replace(/[^0-9.]/g,""); }
-      if(v !== el.value) el.value = v;
-      var item = findItem(cat, id); if(item) item[field] = v;
-      if(cat==="shared" && item && (field==="sharePct" || field==="extra")){
-        saveSplit(item.name, item.sharePct, item.extra);
-      }
-      scheduleSave(); updateDerived();
-    } else if(el.dataset && el.dataset.acct !== undefined){
-      var v2 = el.value.replace(/[^0-9.]/g,""); if(v2 !== el.value) el.value = v2;
-      if(!state.data.rollover || typeof state.data.rollover!=="object") state.data.rollover = emptyRollover();
-      state.data.rollover[el.dataset.acct] = v2;
-      scheduleSave(); updateDerived();
-    }
-  });
-  app.addEventListener("change", function(e){
-    var el = e.target;
-    if(el.dataset && el.dataset.field==="account"){
-      var item = findItem(el.dataset.cat, el.dataset.id); if(item) item.account = el.value;
-      scheduleSave(); updateDerived();
-    } else if(el.id==="sharedAcctSel"){
-      state.data.shared.forEach(function(i){ i.account = el.value; });
-      saveNow(); updateDerived();
-    } else if(el.id==="currencySel"){
-      state.currency = el.value; saveCurrency(state.currency); fmtCache = {};
-      renderLines(); updateDerived();
-    }
-  });
-  app.addEventListener("click", function(e){
-    var b = e.target.closest ? e.target.closest("[data-action]") : null;
-    if(!b) return;
-    var a = b.dataset.action;
-    if(a==="add"){
-      var cat = b.dataset.cat, ni = newItem(cat);
-      if(cat==="shared" && state.data.shared[0] && state.data.shared[0].account){ ni.account = state.data.shared[0].account; }
-      state.data[cat].push(ni); saveNow(); renderLines(); updateDerived();
-    }
-    else if(a==="del"){ var cat=b.dataset.cat, id=b.dataset.id; state.data[cat] = state.data[cat].filter(function(x){ return x.id!==id; }); saveNow(); renderLines(); updateDerived(); }
-    else if(a==="prev"){ navMonth(-1); }
-    else if(a==="next"){ navMonth(1); }
-    else if(a==="copycard"){ copyCard(b.dataset.cat); }
-    else if(a==="loadshared"){ importSharedExpenses(); }
-    else if(a==="sync-open"){ openSyncPanel(); }
-    else if(a==="sync-close"){ closeSyncPanel(); }
-    else if(a==="sync-save"){ saveSyncPanel(); }
-    else if(a==="sync-forget"){ forgetToken(); }
-    else if(a==="sync-push"){ syncPush(); }
-    else if(a==="sync-pull"){ syncPull(); }
-    else if(a==="cf-mine"){ resolveConflict("mine"); }
-    else if(a==="cf-remote"){ resolveConflict("remote"); }
-    else if(a==="cf-cancel"){ closeConflict(); }
-    else if(a==="export"){ exportData(); }
-    else if(a==="import"){ $("#fileInput").click(); }
-  });
-  $("#fileInput").addEventListener("change", function(e){
-    var f = e.target.files && e.target.files[0]; if(!f) return;
-    var r = new FileReader();
-    r.onload = function(){ try { importData(JSON.parse(r.result)); } catch(err){ alert("Could not read that file."); } };
-    r.readAsText(f);
-    e.target.value = "";
-  });
-}
-
-/* ------------------------------ init ----------------------------- */
-function init(){
-  app = document.getElementById("app");
-  state.currency = loadCurrency() || "USD";
-  var realKey = ymKey(new Date());
-  state.monthKey = allMonthKeys().length ? realKey : "2026-06";
-  state.data = getMonth(state.monthKey);
-  app.innerHTML = shellHTML();
-  $("#currencySel").value = state.currency;
-  $("#monthLabel").textContent = monthLabel(state.monthKey);
-  wireEvents();
-  renderLines();
-  updateDerived();
-
-  window.addEventListener("beforeunload", flushSave);
-  window.addEventListener("pagehide", flushSave);
-  document.addEventListener("visibilitychange", function(){
-    if(document.visibilityState === "hidden") flushSave();
-  });
-}
-init();
+render();
 </script>
 </body>
 </html>
