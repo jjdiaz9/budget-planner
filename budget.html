@@ -1045,8 +1045,31 @@ function requireConfig(){
   return c;
 }
 
-/* ---- pull ---- */
+/* ---- only one sync operation at a time ----
+   Auto-push and a manual click can otherwise overlap: both read a sha, the
+   first write invalidates it, and the second fails as a false conflict. */
+var syncBusy = false;
+function beginSync(){
+  if(syncBusy){ setStatus("Sync already running\u2026"); return false; }
+  syncBusy = true; return true;
+}
+function endSync(){ syncBusy = false; }
+
 async function syncPull(force){
+  if(!beginSync()) return;
+  try { return await syncPullInner(force); } finally { endSync(); }
+}
+async function syncPush(force){
+  if(!beginSync()) return;
+  try { return await syncPushInner(force); } finally { endSync(); }
+}
+async function resolveConflict(keep){
+  if(!beginSync()) return;
+  try { return await resolveConflictInner(keep); } finally { endSync(); }
+}
+
+/* ---- pull ---- */
+async function syncPullInner(force){
   var c = requireConfig(); if(!c) return;
   setStatus("Checking…");
   var r;
@@ -1070,7 +1093,7 @@ async function syncPull(force){
 }
 
 /* ---- push ---- */
-async function syncPush(force){
+async function syncPushInner(force){
   var c = requireConfig(); if(!c) return;
   saveNow();
   setStatus("Checking…");
@@ -1133,16 +1156,35 @@ function fmtWhen(iso){
 }
 function closeConflict(){ $("#conflictWrap").style.display = "none"; pendingConflict = null; }
 
-async function resolveConflict(keep){
+async function resolveConflictInner(keep){
   if(!pendingConflict) return;
   var pc = pendingConflict, c = loadSyncCfg();
   var stamp = new Date().toISOString().slice(0,10);
   if(keep === "mine"){
-    /* back up the copy being discarded, then overwrite it */
+    /* The dialog may have been open a while. Re-read so the write carries a
+       current sha, and if the other side moved on again, show that new copy
+       instead of failing with a conflict the user cannot act on. */
+    var fresh;
+    setStatus("Checking…");
+    try { fresh = await ghReadPath(c, c.path); }
+    catch(e){ setStatus("Push failed"); alert(e.message); return; }
+
+    if(!fresh.missing){
+      var freshRev = (fresh.payload.sync && fresh.payload.sync.rev) || 0;
+      var shownRev = (pc.remote.sync && pc.remote.sync.rev) || 0;
+      if(fresh.sha !== pc.sha && freshRev !== shownRev){
+        closeConflict();
+        showConflict(fresh.payload, fresh.sha, pc.origin);
+        alert("The copy in the repository changed again while this dialog was open.\n\n"
+              + "Shown here as it stands now — nothing has been overwritten.");
+        return;
+      }
+    }
     download("budget-backup-repo-" + stamp + ".json", JSON.stringify(pc.remote, null, 2));
     var payload = buildPayload();
     setStatus("Pushing…");
-    try { await ghWrite(c, payload, pc.sha, "budget: resolve conflict, keep " + c.device); }
+    try { await ghWrite(c, payload, fresh.missing ? null : fresh.sha,
+                        "budget: resolve conflict, keep " + c.device); }
     catch(e){ setStatus("Push failed"); alert(e.message); return; }
     var c2 = loadSyncCfg(); c2.baseRev = payload.sync.rev; saveSyncCfg(c2);
     setStatus("Kept this device’s copy");
@@ -1228,7 +1270,7 @@ function maybeAutoPush(){
   var c = loadSyncCfg();
   if(!c.auto || !c.owner || !c.repo || !getToken()) return;
   if(autoPushTimer) clearTimeout(autoPushTimer);
-  autoPushTimer = setTimeout(function(){ syncPush(); }, 2500);
+  autoPushTimer = setTimeout(function(){ if(!syncBusy) syncPush(); }, 2500);
 }
 
 function findItem(cat, id){ var a = state.data[cat]; for(var i=0;i<a.length;i++){ if(a[i].id===id) return a[i]; } return null; }
