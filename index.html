@@ -91,6 +91,16 @@ html,body{margin:0;background:#EFEAE0;font-family:'Inter',system-ui,sans-serif;c
 .bgt-copycard{border:1px dashed var(--line);background:none;color:var(--soft);font-family:'Inter',sans-serif;font-size:12.5px;font-weight:500;padding:9px 12px;border-radius:9px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;transition:.15s;}
 .bgt-copycard:hover{border-color:var(--ink);color:var(--ink);}
 .bgt-empty{font-size:13px;color:var(--soft);font-style:italic;margin:4px 0;}
+.bgt-oncard{display:flex;align-items:center;gap:8px;padding:5px 4px 5px 26px;font-size:12.5px;color:var(--soft);position:relative;}
+.bgt-oncard::before{content:'\21B3';position:absolute;left:10px;top:4px;opacity:.55;}
+.bgt-oncard .bgt-oc-name{flex:1 1 auto;color:var(--ink);}
+.bgt-oncard .bgt-oc-num{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.bgt-oncard .bgt-oc-pct{width:44px;text-align:right;}
+.bgt-oncard .bgt-yourshare{color:var(--ink);}
+.bgt-oncard.bgt-remainder{font-style:italic;border-top:1px dashed var(--line);margin-top:2px;padding-top:7px;}
+.bgt-oncard.bgt-remainder.bgt-over,.bgt-oncard.bgt-remainder.bgt-over .bgt-yourshare{color:#BC4A33;}
+.bgt-oc-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:20px;background:#F4EBD6;color:#B0842B;white-space:nowrap;}
+.bgt-oc-orphan{margin-top:8px;padding-top:6px;border-top:1px dashed var(--line);font-size:12px;color:var(--soft);}
 
 .bgt-rollover .bgt-cardhead{margin-bottom:12px;}
 .bgt-rolllist{display:flex;flex-direction:column;gap:8px;}
@@ -262,7 +272,7 @@ var SEED_VERSION = 3;
 
 function isEmptyMonth(d){
   var cats = ["income","fixed","variable","shared","savings"];
-  var anyAmt = cats.some(function(c){ return (d[c]||[]).some(function(i){ return num(i.amount) !== 0; }); });
+  var anyAmt = cats.some(function(c){ return (d[c]||[]).some(function(i){ return !isOnCard(i) && num(i.amount) !== 0; }); });
   var ro = rolloverObj(d);
   var anyRoll = Object.keys(ro).some(function(k){ return num(ro[k]) !== 0; });
   return !anyAmt && !anyRoll;
@@ -333,12 +343,17 @@ function withRetirement(d){
 
 /* --------------------------- computation ------------------------- */
 function sharedPart(i){ var extra = num(i.extra); return (num(i.amount) - extra) * (num(i.sharePct)/100) + extra; }
+/* A shared row with onCard set is a charge that already sits inside a card-statement row
+   listed above it (the household file's onCard). It is shown for reference — so the statement
+   can be split into YNAB categories — but counting it would double-count the statement. */
+function isOnCard(i){ return !!(i && i.onCard); }
+function countedShared(d){ return (d.shared || []).filter(function(i){ return !isOnCard(i); }); }
 function grossByAccount(d){
   var g = {};
   function add(acct, amt){ if(acct){ g[acct] = (g[acct]||0) + amt; } }
   (d.fixed||[]).forEach(function(i){ add(i.account, num(i.amount)); });
   (d.variable||[]).forEach(function(i){ add(i.account, num(i.amount)); });
-  (d.shared||[]).forEach(function(i){ add(i.account, sharedPart(i)); });
+  countedShared(d).forEach(function(i){ add(i.account, sharedPart(i)); });
   (d.savings||[]).forEach(function(i){ add(i.account, num(i.amount)); });
   return g;
 }
@@ -346,8 +361,8 @@ function computeTotals(d){
   d = withRetirement(d);
   function sum(a){ return a.reduce(function(s,i){ return s + num(i.amount); }, 0); }
   var income = sum(d.income), fixed = sum(d.fixed), variable = sum(d.variable);
-  var sharedFull = sum(d.shared);
-  var sharedYou = d.shared.reduce(function(s,i){ return s + sharedPart(i); }, 0);
+  var sharedFull = sum(countedShared(d));
+  var sharedYou = countedShared(d).reduce(function(s,i){ return s + sharedPart(i); }, 0);
   var savings = sum(d.savings);
   var ro = rolloverObj(d);
   var rollover = ROLLOVER_ACCTS.reduce(function(s,a){ return s + num(ro[a]); }, 0);
@@ -377,7 +392,7 @@ function buildPlan(data){
   }
   data.fixed.forEach(function(i){ push(i.account, num(i.amount), "Fixed"); });
   data.variable.forEach(function(i){ push(i.account, num(i.amount), "Variable"); });
-  data.shared.forEach(function(i){ push(i.account, sharedPart(i), "Shared (your share)"); });
+  countedShared(data).forEach(function(i){ push(i.account, sharedPart(i), "Shared (your share)"); });
   data.savings.forEach(function(i){ push(i.account, num(i.amount), "Savings"); });
   var ro = rolloverObj(data);
   var transfers = ACCOUNTS.filter(function(a){ return a.name!==HUB && grp[a.name] && grp[a.name].gross!==0; }).map(function(a){
@@ -593,6 +608,68 @@ function rowHTML(cat, i){
   return html;
 }
 
+/* Shared rows, with each card statement's on-card charges nested beneath it plus a remainder
+   line (the part of the statement not itemised in the household file). On-card rows are
+   read-only: the household file owns them, and they are refreshed on every Load. */
+function sharedListHTML(items){
+  var byCard = {};
+  items.forEach(function(i){ if(isOnCard(i)){ (byCard[i.onCard] = byCard[i.onCard] || []).push(i); } });
+  var html = "";
+  items.forEach(function(i){
+    if(isOnCard(i)) return;
+    html += rowHTML("shared", i);
+    var kids = byCard[i.name];
+    if(kids){ html += kids.map(onCardRowHTML).join("") + remainderRowHTML(i, kids); delete byCard[i.name]; }
+  });
+  var orphans = Object.keys(byCard);
+  if(orphans.length){
+    html += '<div class="bgt-oc-orphan">Inside a card statement that is no longer listed above:</div>';
+    orphans.forEach(function(card){
+      html += '<div class="bgt-oc-orphan" style="border:none;padding-top:2px;margin-top:0">' + esc(card) + '</div>'
+            + byCard[card].map(onCardRowHTML).join("");
+    });
+  }
+  return html;
+}
+function onCardRowHTML(i){
+  return '<div class="bgt-oncard" data-oncard-id="'+i.id+'">'
+    + '<span class="bgt-oc-name">'+esc(i.name)+'</span>'
+    + '<span class="bgt-oc-num">'+fmt(num(i.amount))+'</span>'
+    + '<span class="bgt-oc-num bgt-oc-pct">'+esc(i.sharePct)+'%</span>'
+    + '<span class="bgt-yourshare" data-id="'+i.id+'">= '+fmt(sharedPart(i))+'</span>'
+    + '<span class="bgt-oc-tag" title="Already inside the statement above — shown for reference, not counted">in statement</span>'
+    + '</div>';
+}
+function remainderOf(parent, kids){
+  var full = num(parent.amount), you = sharedPart(parent);
+  kids.forEach(function(k){ full -= num(k.amount); you -= sharedPart(k); });
+  return { full:full, you:you };
+}
+function remainderRowHTML(parent, kids){
+  var r = remainderOf(parent, kids), over = r.full < -0.005;
+  return '<div class="bgt-oncard bgt-remainder'+(over?" bgt-over":"")+'" data-remainder-for="'+parent.id+'">'
+    + '<span class="bgt-oc-name">'+(over ? "Itemised charges exceed the statement" : "Other charges on this statement")+'</span>'
+    + '<span class="bgt-oc-num" data-rem-full>'+fmt(r.full)+'</span>'
+    + '<span class="bgt-oc-num bgt-oc-pct"></span>'
+    + '<span class="bgt-yourshare" data-rem-you>= '+fmt(r.you)+'</span>'
+    + '<span class="bgt-oc-tag" style="visibility:hidden">in statement</span>'
+    + '</div>';
+}
+/* Keep remainder lines live while the statement row above them is being edited. */
+function updateRemainders(){
+  var items = state.data.shared || [], byCard = {};
+  items.forEach(function(i){ if(isOnCard(i)){ (byCard[i.onCard] = byCard[i.onCard] || []).push(i); } });
+  items.forEach(function(p){
+    if(isOnCard(p) || !byCard[p.name]) return;
+    var el = document.querySelector('.bgt-remainder[data-remainder-for="'+p.id+'"]'); if(!el) return;
+    var r = remainderOf(p, byCard[p.name]), over = r.full < -0.005;
+    el.classList.toggle("bgt-over", over);
+    el.querySelector(".bgt-oc-name").textContent = over ? "Itemised charges exceed the statement" : "Other charges on this statement";
+    el.querySelector("[data-rem-full]").textContent = fmt(r.full);
+    el.querySelector("[data-rem-you]").textContent = "= " + fmt(r.you);
+  });
+}
+
 function renderLines(){
   var rl = $("#rolloverList"); var rhtml = "";
   var ro = rolloverObj(state.data);
@@ -607,7 +684,7 @@ function renderLines(){
   ["income","fixed","variable","shared","savings"].forEach(function(cat){
     var box = $("#lines-"+cat); var items = state.data[cat];
     if(!items.length){ box.innerHTML = '<p class="bgt-empty">No entries yet — add your first line below.</p>'; return; }
-    box.innerHTML = items.map(function(i){ return rowHTML(cat, i); }).join("");
+    box.innerHTML = (cat==="shared") ? sharedListHTML(items) : items.map(function(i){ return rowHTML(cat, i); }).join("");
   });
 
   syncRetInputs();
@@ -645,6 +722,7 @@ function updateDerived(){
     var sp = document.querySelector('.bgt-yourshare[data-id="'+i.id+'"]');
     if(sp) sp.textContent = "= " + fmt(sharedPart(i));
   });
+  updateRemainders();
 
   renderRetRow();
 
@@ -1440,23 +1518,33 @@ function extractHousehold(doc, monthKey, meId){
   var cats = yr.categories || [];
   var data = {}, splits = {}, skipped = [];
 
+  var nameById = {};
+  cats.forEach(function(cat){ if(cat.id && cat.name) nameById[cat.id] = cat.name; });
+  var onCard = [];
+
   cats.forEach(function(cat){
     var name = cat.name;
     if(!name) return;
-
-    if(cat.onCard){ skipped.push(name); return; }   /* already inside a statement line */
 
     var amt = cat.amounts && cat.amounts[month];
     if(typeof amt !== "number" || !isFinite(amt) || amt === 0) return;
 
     var sp = cat.split || {}, pct = "50";
-    if(sp.mode === "solo")      pct = (sp.personId === meId) ? "100" : "0";
-    else if(sp.mode === "even") pct = "50";
+    if(sp.mode === "solo")        pct = (sp.personId === meId) ? "100" : "0";
+    else if(sp.mode === "custom") pct = (sp.pct && sp.pct[meId] != null) ? String(sp.pct[meId]) : "50";
+    else                          pct = "50";
 
-    data[name] = Math.round(amt * 100) / 100;
+    amt = Math.round(amt * 100) / 100;
+    if(cat.onCard){
+      /* Inside a statement row: carried through for reference, never counted. */
+      onCard.push({ name:name, amount:amt, pct:pct, card:nameById[cat.onCard] || String(cat.onCard) });
+      skipped.push(name);
+      return;
+    }
+    data[name] = amt;
     splits[name] = pct;
   });
-  return { data:data, splits:splits, skipped:skipped };
+  return { data:data, splits:splits, skipped:skipped, onCard:onCard };
 }
 
 async function importSharedExpenses(){
@@ -1500,12 +1588,12 @@ async function importSharedExpenses(){
     alert("No shared expenses recorded for " + monthLabel(state.monthKey) + ".");
     return;
   }
-  applySharedData(res.data, res.splits, res.skipped.length);
+  applySharedData(res.data, res.splits, res.skipped.length, res.onCard);
 }
 
 /* The file is authoritative for the percentage. It has no concept of a fixed
    amount one person always pays, so that is kept from your own settings. */
-function applySharedData(d, splits, rolledUp){
+function applySharedData(d, splits, rolledUp, onCard){
   var acct = (state.data.shared[0] && state.data.shared[0].account) || DEFAULT_ACCT.shared;
   var names = Object.keys(d);
   state.data.shared = names.map(function(name){
@@ -1514,16 +1602,22 @@ function applySharedData(d, splits, rolledUp){
     return { id:uid(), name:name, amount:String(d[name]),
              sharePct:pct, extra:saved.extra || "", account:acct };
   });
+  /* On-card charges ride along as read-only reference rows under their statement. The file is
+     authoritative for them, so a Load always replaces the previous set. */
+  (onCard || []).forEach(function(o){
+    state.data.shared.push({ id:uid(), name:o.name, amount:String(o.amount),
+                             sharePct:o.pct, extra:"", account:acct, onCard:o.card });
+  });
   saveNow(); renderLines(); updateDerived();
   setStatus("Loaded " + names.length + " for " + monthLabel(state.monthKey)
-            + (rolledUp ? " (" + rolledUp + " card items rolled up)" : ""));
+            + (rolledUp ? " (" + rolledUp + " inside card statements, shown for reference)" : ""));
 }
 
 function copyCard(cat){
   var pd = loadMonthRaw(shiftMonth(state.monthKey, -1));
   if(!pd || !pd[cat] || !pd[cat].length) return;
   var reset = !!RESET_AMOUNT[cat];
-  var lines = pd[cat].map(function(x){
+  var lines = pd[cat].filter(function(x){ return !isOnCard(x); }).map(function(x){
     var o = {}; for(var k in x) o[k]=x[k];
     o.id = uid();
     if(reset) o.amount = "";
