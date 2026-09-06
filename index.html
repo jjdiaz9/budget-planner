@@ -83,17 +83,11 @@ html,body{margin:0;background:#EFEAE0;font-family:'Inter',system-ui,sans-serif;c
 .bgt-dname{flex:1 1 auto;}
 .bgt-damt{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;}
 .bgt-dacct{font-size:11.5px;padding:3px 9px;border-radius:20px;white-space:nowrap;}
-.bgt-retbar{margin-top:11px;padding:11px 12px;border:1px solid var(--line);border-radius:11px;background:#FBFAF6;}
-.bgt-rethead{display:flex;align-items:center;gap:9px;margin-bottom:10px;}
-.bgt-rettitle{font-size:13px;font-weight:600;color:var(--ink);}
-.bgt-retgrid{display:flex;flex-wrap:wrap;gap:9px 15px;align-items:center;}
-.bgt-retfield{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--soft);}
-.bgt-retfield b{font-family:'IBM Plex Mono',monospace;font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums;}
-.bgt-retfield .bgt-in{width:84px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:6px 8px;}
-.bgt-retflag{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:20px;background:#EFE9DA;color:#B0842B;}
-.bgt-retflag.ok{background:#E4F0EA;color:#1F7A5C;}
-.bgt-retflag.bad{background:#F7E3DE;color:#BC4A33;}
-.bgt-retnote{font-size:12px;color:var(--soft);margin:10px 0 0;line-height:1.5;}
+.bgt-retbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin-top:11px;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:#FBFAF6;font-size:12.5px;color:var(--soft);}
+.bgt-retbar label{display:flex;align-items:center;gap:7px;cursor:pointer;color:var(--ink);font-weight:600;}
+.bgt-retpct{display:flex;align-items:center;gap:5px;}
+.bgt-retpct .bgt-in{width:74px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:6px 8px;}
+.bgt-rethint{flex:1 1 100%;margin:0;font-size:12px;line-height:1.5;}
 .bgt-copycard{border:1px dashed var(--line);background:none;color:var(--soft);font-family:'Inter',sans-serif;font-size:12.5px;font-weight:500;padding:9px 12px;border-radius:9px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;transition:.15s;}
 .bgt-copycard:hover{border-color:var(--ink);color:var(--ink);}
 .bgt-empty{font-size:13px;color:var(--soft);font-style:italic;margin:4px 0;}
@@ -293,76 +287,42 @@ function normalize(d){
   };
 }
 
-/* ------------------------ retirement settings --------------------
-   Stored under one global key, same shape idea as budget:splits — rates are set once and
-   apply to every month, and monthly gross is a { monthKey: amount } map so each month can
-   derive its own withholding without touching the month document. Deliberately outside the
-   month doc: normalize() whitelists month keys and would strip it, and keeping it out means
-   editing a rate never marks the month dirty for sync. It also means these settings do NOT
-   travel on Push/Pull — they are per-browser, like your split rules. */
+/* ------------------------ retirement line ------------------------
+   One number: the Roth contribution as a percentage of the month's income total. Stored under
+   its own global key (same idea as budget:splits) so it applies to every month, never lands in
+   the month document — normalize() would strip it — and never marks a month dirty for sync.
+   Like the split rules, it does not travel on Push/Pull. Nothing personal is hardcoded: the
+   percentage ships empty and is entered once. */
 var RET_KEY = "budget:retirement";
 var RET_ACCT = "Roth IRA";
 var RET_LABEL = "Retirement — 401(k) as Roth";
-/* Public tax rates ship as defaults; the election and the withholding fallback are personal
-   (yours is calibrated from your own pay), so they start empty and are filled in once from
-   the panel. Nothing personal is hardcoded here, same as the split rules below. */
-var RET_DEFAULTS = { on:true, fed:"22", state:"4.4", deferral:"", wh:"" };
 function loadRet(){
-  var o = {}; for(var k in RET_DEFAULTS) o[k] = RET_DEFAULTS[k];
-  o.gross = {};
+  var o = { on:true, pct:"" };
   try {
     var s = JSON.parse(lsGet(RET_KEY) || "{}");
-    for(var k2 in RET_DEFAULTS){ if(s[k2] !== undefined && s[k2] !== null) o[k2] = s[k2]; }
-    if(s.gross && typeof s.gross === "object") o.gross = s.gross;
+    if(s.on === false) o.on = false;
+    if(s.pct !== undefined && s.pct !== null) o.pct = String(s.pct);
   } catch(e){}
-  o.on = (o.on !== false);
   return o;
 }
 function saveRet(c){ lsSet(RET_KEY, JSON.stringify(c)); }
 
-/* Sanity band for a withholding rate derived from gross. In derived mode the contribution
-   collapses to gross * deferral * (1 - combinedMarginal), so a gross entered on a different
-   basis than the net (one paycheck against a whole month) produces a wrong number that still
-   looks plausible. Progressivity moves this rate about a point across a normal hours range,
-   so a large gap from the calibrated fallback is a basis mismatch, not a tax effect. */
-var WH_MIN = 5, WH_MAX = 60, WH_DRIFT = 8;   /* percentage points */
-
-/* monthlyNet is the month's income total — the app books actual deposits per month
-   ("Paychecks land in Short Term Savings"), so this is real take-home, not a 26/12 average.
-   Smoothing here would disagree with the Income card directly above it, and a three-paycheck
-   month genuinely does carry three contributions. */
-function retirementFor(d, monthKey){
+/* Contribution = income total × pct. Income here is the month's actual deposits, so a
+   three-paycheck month carries three contributions and this line stays consistent with the
+   Income card above it. */
+function retirementFor(d){
   var c = loadRet();
   var net = (d.income || []).reduce(function(s,i){ return s + num(i.amount); }, 0);
-  var combined = num(c.fed) + num(c.state);
-  var gross = num((c.gross || {})[monthKey]);
-  var hasFallback = String(c.wh).trim() !== "";
-  var hasDeferral = String(c.deferral).trim() !== "" && num(c.deferral) !== 0;
-  var wh = num(c.wh), derived = false, suspect = null;
-  if(gross > 0 && net > 0){
-    var w = (1 - net / gross) * 100;
-    /* The drift test needs a calibrated fallback to measure against. With none set yet, the
-       absolute band is the only check available — so accept a plausible rate rather than
-       flagging every one of them against a fallback of zero. */
-    var plausible = w >= WH_MIN && w <= WH_MAX;
-    if(plausible && (!hasFallback || Math.abs(w - num(c.wh)) <= WH_DRIFT)){ wh = w; derived = true; }
-    else suspect = w;
-  }
-  var denom = 100 - wh;
-  var configured = hasDeferral && (hasFallback || derived);
-  var ok = !!c.on && configured && denom > 0 && combined < 100;
-  var factor = ok ? (num(c.deferral)/100) * (1 - combined/100) / (denom/100) : 0;
-  return { cfg:c, on:!!c.on, net:net, gross:gross, combined:combined, wh:wh,
-           derived:derived, suspect:suspect, factor:factor, ok:ok,
-           configured:configured, hasFallback:hasFallback, hasDeferral:hasDeferral,
-           amount: ok ? net * factor : 0 };
+  var pct = num(c.pct);
+  var ok = c.on && pct > 0 && pct < 100;
+  return { on:c.on, pct:pct, net:net, ok:ok, amount: ok ? net * pct / 100 : 0 };
 }
 
-/* Returns a COPY of the month with the derived contribution appended to savings, so it flows
-   through totals and the transfer plan exactly like a hand-entered savings line — it is real
-   cash leaving checking. state.data is never mutated, so nothing derived is ever persisted. */
+/* Returns a COPY of the month with the contribution appended to savings, so it flows through
+   totals and the transfer plan exactly like a hand-entered savings line — it is real cash
+   leaving checking. state.data is never mutated, so nothing derived is ever persisted. */
 function withRetirement(d){
-  var r = retirementFor(d, state.monthKey);
+  var r = retirementFor(d);
   if(!r.ok || Math.abs(r.amount) < 0.005) return d;
   var o = {}; for(var k in d){ o[k] = d[k]; }
   o.savings = (d.savings || []).concat([
@@ -577,34 +537,28 @@ function cardShell(cat){
 }
 
 function retBarHTML(){
-  function pctField(label, id, ret){
-    return '<span class="bgt-retfield">'+label+' <input class="bgt-in" id="'+id+'" inputmode="decimal" data-ret="'+ret+'">%</span>';
-  }
   return '<div class="bgt-retbar">'
-    + '<div class="bgt-rethead">'
-    +   '<label class="bgt-retfield" style="gap:7px;cursor:pointer"><input type="checkbox" id="retOn">'
-    +   '<span class="bgt-rettitle">'+esc(RET_LABEL)+'</span></label>'
-    +   '<span class="bgt-retflag" id="retFlag">fixed</span>'
-    + '</div>'
-    + '<div class="bgt-retgrid">'
-    +   '<span class="bgt-retfield">Monthly net <b id="retNet">\u2014</b></span>'
-    +   '<span class="bgt-retfield">Gross this month <input class="bgt-in" id="retGross" inputmode="decimal" placeholder="optional" data-ret="gross"></span>'
-    +   pctField("Federal", "retFed", "fed")
-    +   pctField("Colorado", "retState", "state")
-    +   pctField("Election", "retDeferral", "deferral")
-    +   pctField("Withholding", "retWh", "wh")
-    +   '<span class="bgt-retfield">Net \u2192 Roth <b id="retFactor">\u2014</b></span>'
-    + '</div>'
-    + '<p class="bgt-retnote" id="retNote"></p>'
+    + '<label><input type="checkbox" id="retOn"> '+esc(RET_LABEL)+'</label>'
+    + '<span class="bgt-retpct"><input class="bgt-in" id="retPct" inputmode="decimal" placeholder="0" data-ret="pct">% of income</span>'
+    + '<p class="bgt-rethint" id="retHint"></p>'
     + '</div>';
 }
 
-/* The derived line is rendered read-only — it is computed, not entered, so it carries no
-   amount input and no delete button. It sits outside #lines-savings so a keystroke in the
-   panel can refresh it without re-rendering (and unfocusing) the editable rows. */
+/* The line is rendered read-only — computed, not entered, so no amount input and no delete.
+   It sits outside #lines-savings so a keystroke in the panel refreshes it without re-rendering
+   (and unfocusing) the editable rows. */
 function renderRetRow(){
   var box = $("#retRow"); if(!box) return;
-  var r = retirementFor(state.data, state.monthKey);
+  var r = retirementFor(state.data);
+  var hint = $("#retHint");
+  if(hint){
+    hint.textContent = r.ok
+      ? fmt(r.net) + " income \u00d7 " + r.pct + "% = " + fmt(r.amount) + ", routed to " + RET_ACCT + " on the transfer slip."
+      : (r.on
+          ? "Enter the after-tax share of take-home you put in. From a 401(k) election, that is "
+            + "election \u00d7 (1 \u2212 federal \u2212 state marginal) \u00f7 (1 \u2212 withholding rate)."
+          : "Switch on to add a Roth contribution to this month's plan.");
+  }
   if(!r.ok || Math.abs(r.amount) < 0.005){ box.innerHTML = ""; return; }
   var m = ACCT_BY_NAME[RET_ACCT];
   box.innerHTML = '<div class="bgt-derived">'
@@ -613,51 +567,10 @@ function renderRetRow(){
     + '<span class="bgt-dacct" style="background:'+m.soft+';color:'+m.color+'">'+esc(RET_ACCT)+'</span>'
     + '</div>';
 }
-
-/* Values into the inputs. Called on month change (gross is per month), not per keystroke. */
 function syncRetInputs(){
   var c = loadRet(); if(!$("#retOn")) return;
   $("#retOn").checked = c.on;
-  $("#retFed").value = c.fed;
-  $("#retState").value = c.state;
-  $("#retDeferral").value = c.deferral;
-  $("#retWh").value = c.wh;
-  $("#retGross").value = (c.gross || {})[state.monthKey] || "";
-}
-
-function renderRetReadouts(){
-  if(!$("#retNet")) return;
-  var r = retirementFor(state.data, state.monthKey);
-  $("#retNet").textContent = fmt(r.net);
-  $("#retFactor").textContent = r.ok ? (r.factor*100).toFixed(2)+"%" : "\u2014";
-  var flag = $("#retFlag"), note = $("#retNote");
-  if(!r.on){
-    flag.className = "bgt-retflag"; flag.textContent = "off";
-    note.textContent = "Switch on to add a Roth contribution to this month's plan.";
-  } else if(!r.configured){
-    flag.className = "bgt-retflag"; flag.textContent = "set up";
-    note.textContent = !r.hasDeferral
-      ? "Enter your 401(k) election to start. Then either give this month's gross \u2014 the most accurate route, "
-        + "since withholding is derived from it \u2014 or set a withholding fallback to use when gross is blank."
-      : "Enter this month's gross, or a withholding fallback, so the after-tax amount can be worked out.";
-  } else if(!r.ok){
-    flag.className = "bgt-retflag bad"; flag.textContent = "check rates";
-    note.textContent = "Withholding and the combined marginal rate must each be under 100%.";
-  } else if(r.suspect !== null){
-    flag.className = "bgt-retflag bad"; flag.textContent = "gross looks off";
-    note.textContent = "That gross implies " + r.suspect.toFixed(2) + "% withholding, too far from your "
-      + num(r.cfg.wh).toFixed(2) + "% fallback to be a tax effect. Gross should cover the same paychecks as the "
-      + fmt(r.net) + " of income above \u2014 a single period's gross here would be the usual cause. "
-      + "Holding the fallback rate until it looks right.";
-  } else if(r.derived){
-    flag.className = "bgt-retflag ok"; flag.textContent = "derived from gross";
-    note.textContent = "Withholding derived from this month's gross (1 \u2212 " + fmt(r.net) + " \u00f7 "
-      + fmt(r.gross) + " = " + r.wh.toFixed(2) + "%). Exact, and it self-corrects as pay changes.";
-  } else {
-    flag.className = "bgt-retflag"; flag.textContent = "fixed";
-    note.textContent = "Using the fixed withholding fallback \u2014 only accurate at the income it was "
-      + "calibrated at, because federal withholding is progressive. Enter this month's gross to derive it instead.";
-  }
+  $("#retPct").value = c.pct;
 }
 
 function rowHTML(cat, i){
@@ -734,7 +647,6 @@ function updateDerived(){
   });
 
   renderRetRow();
-  renderRetReadouts();
 
   renderSlip(t, over);
   renderCharts(t);
@@ -1673,17 +1585,11 @@ function wireEvents(){
       }
       scheduleSave(); updateDerived();
     } else if(el.dataset && el.dataset.ret){
-      /* Retirement settings live outside the month document, so this path deliberately does
-         not call scheduleSave() — editing a rate must not mark the month dirty for sync. */
-      var f = el.dataset.ret;
+      /* Lives outside the month document, so deliberately no scheduleSave() — editing the
+         percentage must not mark the month dirty for sync. */
       var rv = el.value.replace(/[^0-9.]/g,"");
       if(rv !== el.value) el.value = rv;
-      var rc = loadRet();
-      if(f==="gross"){
-        rc.gross = rc.gross || {};
-        if(rv==="") delete rc.gross[state.monthKey]; else rc.gross[state.monthKey] = rv;
-      } else { rc[f] = rv; }
-      saveRet(rc);
+      var rc = loadRet(); rc.pct = rv; saveRet(rc);
       updateDerived();
     } else if(el.dataset && el.dataset.acct !== undefined){
       var v2 = el.value.replace(/[^0-9.]/g,""); if(v2 !== el.value) el.value = v2;
