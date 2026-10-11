@@ -68,7 +68,7 @@ html,body{margin:0;background:#EFEAE0;font-family:'Inter',system-ui,sans-serif;c
 .bgt-amt{display:flex;align-items:center;border:1px solid var(--line);border-radius:9px;background:var(--paper);padding-left:10px;transition:border-color .15s,background .15s;}
 .bgt-amt:focus-within{border-color:var(--ink);background:#fff;}
 .bgt-cur{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--soft);}
-.bgt-money{border:none;background:none;width:96px;text-align:right;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;padding:9px 10px 9px 4px;}
+.bgt-money{border:none;background:none;width:118px;text-align:right;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;padding:9px 10px 9px 4px;}
 .bgt-money:focus{background:none;}
 .bgt-share{display:flex;align-items:center;border:1px solid var(--line);border-radius:9px;background:var(--paper);padding-right:9px;}
 .bgt-share:focus-within{border-color:var(--ink);background:#fff;}
@@ -77,7 +77,7 @@ html,body{margin:0;background:#EFEAE0;font-family:'Inter',system-ui,sans-serif;c
 .bgt-yourshare{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--soft);font-variant-numeric:tabular-nums;white-space:nowrap;padding:0 2px;}
 .bgt-extra{display:flex;align-items:center;border:1px solid var(--line);border-radius:9px;background:var(--paper);padding-left:7px;gap:1px;}
 .bgt-extra:focus-within{border-color:var(--ink);background:#fff;}
-.bgt-extrain{width:54px;}
+.bgt-extrain{width:86px;}
 .bgt-del{border:none;background:none;color:var(--soft);width:30px;height:30px;border-radius:8px;display:grid;place-items:center;cursor:pointer;flex-shrink:0;}
 .bgt-del:hover{background:#F7E5DF;color:#BC4A33;}
 .bgt-add{border:1px dashed var(--line);background:none;color:var(--soft);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;padding:9px;border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;flex:1;transition:.15s;}
@@ -112,7 +112,7 @@ html,body{margin:0;background:#EFEAE0;font-family:'Inter',system-ui,sans-serif;c
 .bgt-rollchip{width:26px;height:26px;border-radius:8px;flex-shrink:0;}
 .bgt-rollname{flex:1;font-size:13.5px;font-weight:500;min-width:0;}
 .bgt-rollin{flex:0 0 auto;}
-.bgt-rollin .bgt-money{width:110px;text-align:right;padding-right:10px;}
+.bgt-rollin .bgt-money{width:124px;text-align:right;padding-right:10px;}
 .bgt-copy{border:1px solid var(--line);background:var(--card);color:var(--soft);font-family:'Inter',sans-serif;font-size:13px;padding:11px;border-radius:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:.15s;}
 .bgt-copy:hover{border-color:var(--ink);color:var(--ink);}
 
@@ -464,8 +464,25 @@ var state = { monthKey:null, data:null, currency:"USD" };
 var app, fmtCache = {};
 function fmt(n){
   var f = fmtCache[state.currency];
-  if(!f){ f = new Intl.NumberFormat(undefined, { style:"currency", currency:state.currency, maximumFractionDigits:2 }); fmtCache[state.currency] = f; }
-  return f.format(n || 0);
+  if(!f){
+    var o = { style:"currency", currency:state.currency, currencySign:"accounting", minimumFractionDigits:2, maximumFractionDigits:2 };
+    try { f = new Intl.NumberFormat(undefined, o); } catch(e){ delete o.currencySign; f = new Intl.NumberFormat(undefined, o); }
+    fmtCache[state.currency] = f;
+  }
+  var v = Math.round((n || 0) * 100) / 100;
+  return f.format(v === 0 ? 0 : v);   /* no "($0.00)" from -0 or tiny rounding */
+}
+/* Money inputs keep the raw number in the data ("100", "-50"); the field shows it in
+   accounting format while not being edited, and the raw number while focused. */
+function fmtIn(raw){
+  var t = String(raw == null ? "" : raw).trim();
+  if(t === "" || isNaN(parseFloat(t))) return "";
+  return fmt(parseFloat(t));
+}
+function rawFor(el){
+  if(el.dataset.field){ var it = findItem(el.dataset.cat, el.dataset.id); return it ? (it[el.dataset.field] || "") : ""; }
+  if(el.dataset.acct !== undefined){ var ro = state.data && state.data.rollover; return (ro && ro[el.dataset.acct]) || ""; }
+  return "";
 }
 function sym(){
   try {
@@ -596,10 +613,10 @@ function rowHTML(cat, i){
   var isIncome = cat==="income", showShare = cat==="shared";
   var html = '<div class="bgt-row">';
   html += '<input class="bgt-in bgt-name" placeholder="Description" data-cat="'+cat+'" data-id="'+i.id+'" data-field="name" value="'+esc(i.name)+'">';
-  html += '<div class="bgt-amt"><span class="bgt-cur">'+sym()+'</span><input class="bgt-in bgt-money" inputmode="decimal" placeholder="0" data-cat="'+cat+'" data-id="'+i.id+'" data-field="amount" value="'+esc(i.amount)+'"></div>';
+  html += '<div class="bgt-amt"><input class="bgt-in bgt-money" inputmode="decimal" placeholder="'+fmt(0)+'" data-cat="'+cat+'" data-id="'+i.id+'" data-field="amount" value="'+esc(fmtIn(i.amount))+'"></div>';
   if(showShare){
     html += '<div class="bgt-share" title="Your % of the bill after the fixed extra"><input class="bgt-in bgt-pct" inputmode="decimal" placeholder="50" data-cat="'+cat+'" data-id="'+i.id+'" data-field="sharePct" value="'+esc(i.sharePct)+'"><span class="bgt-pctmark">%</span></div>';
-    html += '<div class="bgt-extra" title="Amount you always pay on top — the rest is split by the % above"><span class="bgt-pctmark">+</span><span class="bgt-cur">'+sym()+'</span><input class="bgt-in bgt-money bgt-extrain" inputmode="decimal" placeholder="0" data-cat="'+cat+'" data-id="'+i.id+'" data-field="extra" value="'+esc(i.extra||"")+'"></div>';
+    html += '<div class="bgt-extra" title="Amount you always pay on top — the rest is split by the % above"><span class="bgt-pctmark">+</span><input class="bgt-in bgt-money bgt-extrain" inputmode="decimal" placeholder="'+fmt(0)+'" data-cat="'+cat+'" data-id="'+i.id+'" data-field="extra" value="'+esc(fmtIn(i.extra))+'"></div>';
     html += '<span class="bgt-yourshare" data-id="'+i.id+'" title="Your calculated part">= '+fmt(sharedPart(i))+'</span>';
   }
   if(!isIncome && cat!=="shared"){
@@ -681,7 +698,7 @@ function renderLines(){
     var m = ACCT_BY_NAME[name];
     rhtml += '<div class="bgt-rollline"><span class="bgt-chip bgt-rollchip" style="background:'+m.soft+';color:'+m.color+'">'+ic(m.icon)+'</span>'
       + '<span class="bgt-rollname">'+name+'</span>'
-      + '<div class="bgt-amt bgt-rollin"><span class="bgt-cur">'+sym()+'</span><input class="bgt-in bgt-money" inputmode="decimal" placeholder="0" data-acct="'+name+'" value="'+esc(ro[name]||"")+'"></div></div>';
+      + '<div class="bgt-amt bgt-rollin"><input class="bgt-in bgt-money" inputmode="decimal" placeholder="'+fmt(0)+'" data-acct="'+name+'" value="'+esc(fmtIn(ro[name]))+'"></div></div>';
   });
   rl.innerHTML = rhtml;
 
@@ -1667,6 +1684,17 @@ function importData(obj){
 
 /* ----------------------------- events ---------------------------- */
 function wireEvents(){
+  app.addEventListener("focusin", function(e){
+    var el = e.target;
+    if(!el.classList || !el.classList.contains("bgt-money")) return;
+    el.value = rawFor(el);
+    try { el.select(); } catch(err){}
+  });
+  app.addEventListener("focusout", function(e){
+    var el = e.target;
+    if(!el.classList || !el.classList.contains("bgt-money")) return;
+    el.value = fmtIn(rawFor(el));
+  });
   app.addEventListener("input", function(e){
     var el = e.target;
     if(el.dataset && el.dataset.field){
