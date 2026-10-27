@@ -155,14 +155,8 @@ html,body{margin:0;background:#EFEAE0;font-family:'Inter',system-ui,sans-serif;c
 .bgt-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .bgt-check{display:flex;align-items:center;gap:8px;font-size:13px;margin:6px 0 2px;}
 .bgt-warn{display:flex;gap:8px;background:#FBF0E4;border:1px solid #E8D3B0;color:#8A5A12;border-radius:9px;padding:10px 12px;font-size:12.5px;line-height:1.45;margin-bottom:12px;}
-.bgt-syncstate{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--soft);margin-top:10px;}
-.bgt-cflist{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px;}
-.bgt-cfcard{border:1px solid var(--line);border-radius:11px;padding:13px;display:flex;flex-direction:column;gap:3px;}
-.bgt-cfcard h4{font-family:'Space Grotesk',sans-serif;font-size:14px;margin:0 0 4px;}
-.bgt-cfmeta{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--soft);}
-.bgt-cfsum{font-size:12.5px;margin:7px 0 10px;}
-.bgt-cfcard .bgt-btn{width:100%;margin-top:auto;}
-@media (max-width:620px){ .bgt-cflist,.bgt-row2{grid-template-columns:1fr;} }
+.bgt-syncstate{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--soft);margin-top:10px;white-space:pre-line;}
+@media (max-width:620px){ .bgt-row2{grid-template-columns:1fr;} }
 
 @media (max-width:820px){
   .bgt{padding:14px;margin:0;border-radius:0;}
@@ -263,7 +257,7 @@ function seedMonth(){
   };
 }
 function it(name, amount, account, sharePct, extra){
-  var o = { id:uid(), name:name, amount:String(amount) };
+  var o = { id:uid(), name:name, amount:String(amount), seed:name };
   if(account) o.account = account;
   if(sharePct !== undefined) o.sharePct = String(sharePct);
   if(extra !== undefined) o.extra = String(extra);
@@ -297,29 +291,30 @@ function normalize(d){
     income:(d.income||[]).map(function(i){ var o={}; for(var k in i) o[k]=i[k]; return o; }),
     fixed:fix(d.fixed,"fixed"), variable:fix(d.variable,"variable"),
     shared:fix(d.shared,"shared"), savings:fix(d.savings,"savings"),
-    rollover:roll, _sv:d._sv
+    rollover:roll, _sv:d._sv, _del:d._del, _rat:d._rat
   };
 }
 
 /* ------------------------ retirement line ------------------------
    One number: the Roth contribution as a percentage of the month's income total. Stored under
-   its own global key (same idea as budget:splits) so it applies to every month, never lands in
-   the month document — normalize() would strip it — and never marks a month dirty for sync.
-   Like the split rules, it does not travel on Push/Pull. Nothing personal is hardcoded: the
-   percentage ships empty and is entered once. */
+   its own global key (same idea as budget:splits) so it applies to every month and never lands
+   in the month document — normalize() would strip it. Like the split rules, it travels in the
+   synced file with its own timestamp. Nothing personal is hardcoded: the percentage ships empty
+   and is entered once. */
 var RET_KEY = "budget:retirement";
 var RET_ACCT = "Roth IRA";
 var RET_LABEL = "Retirement — 401(k) as Roth";
 function loadRet(){
-  var o = { on:true, pct:"" };
+  var o = { on:true, pct:"", at:"" };
   try {
     var s = JSON.parse(lsGet(RET_KEY) || "{}");
     if(s.on === false) o.on = false;
     if(s.pct !== undefined && s.pct !== null) o.pct = String(s.pct);
+    if(s.at) o.at = s.at;
   } catch(e){}
   return o;
 }
-function saveRet(c){ lsSet(RET_KEY, JSON.stringify(c)); }
+function saveRet(c){ c.at = new Date().toISOString(); lsSet(RET_KEY, JSON.stringify(c)); bumpRev(); scheduleAutoPush(); }
 
 /* Contribution = income total × pct. Income here is the month's actual deposits, so a
    three-paycheck month carries three contributions and this line stays consistent with the
@@ -500,7 +495,7 @@ function shellHTML(){
   +   '<div class="bgt-brand"><span class="bgt-logo">'+ic("wallet")+'</span><div><div class="bgt-kicker">Monthly plan</div><h1 class="bgt-h1">Budget &amp; Transfers</h1></div></div>'
   +   '<div class="bgt-controls">'
   +     '<span class="bgt-save" id="saveStatus">All changes saved</span>'
-  +     '<div class="bgt-toolbar"><button class="bgt-btn" data-action="sync-pull" title="Fetch the copy in your private repo">Pull</button><button class="bgt-btn" data-action="sync-push" title="Send this copy to your private repo">Push</button><button class="bgt-btn" data-action="sync-open" title="Sync settings">Sync\u2026</button><button class="bgt-btn" data-action="export">Export</button><button class="bgt-btn" data-action="import">Load</button></div>'
+  +     '<div class="bgt-toolbar"><button class="bgt-btn" data-action="sync-now" title="Pull from your private repo, merge, and push">Sync now</button><button class="bgt-btn" data-action="sync-open" title="Sync settings">Sync\u2026</button><button class="bgt-btn" data-action="export">Export</button><button class="bgt-btn" data-action="import">Load</button></div>'
   +     '<select class="bgt-select" id="currencySel">'+CURRENCIES.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join("")+'</select>'
   +     '<div class="bgt-monthnav"><button data-action="prev" aria-label="Previous month">'+ic("chevL")+'</button><span class="bgt-month" id="monthLabel"></span><button data-action="next" aria-label="Next month">'+ic("chevR")+'</button></div>'
   +   '</div>'
@@ -540,16 +535,13 @@ function shellHTML(){
   +     '<div class="bgt-field"><label>You are</label><select class="bgt-acct" id="syncMe" style="width:100%"></select></div></div>'
   +   '<div class="bgt-field"><label>Access token &mdash; fine-grained, one repository, Contents: Read and write</label>'
   +     '<input type="password" id="syncToken" placeholder="github_pat_..." autocomplete="off"></div>'
-  +   '<label class="bgt-check"><input type="checkbox" id="syncAuto"> Push automatically after edits</label>'
-  +   '<p class="bgt-ordernote">Leaving this off is recommended: every push becomes a commit, and turning it on makes the history noisy.</p>'
+  +   '<label class="bgt-check"><input type="checkbox" id="syncAuto"> Sync automatically</label>'
+  +   '<p class="bgt-ordernote">Pulls when the app opens, every 30 seconds while it\u2019s on screen and when you come back to it; pushes about 10 seconds after you stop editing. If two devices changed things in between, both are merged line by line: the latest edit to a line wins, and lines added on either device are kept. Each push is a commit in the repo.</p>'
   +   '<div class="bgt-syncstate" id="syncState"></div>'
-  +   '<div class="bgt-modalfoot"><button class="bgt-btn" data-action="sync-forget">Forget token</button>'
+  +   '<div class="bgt-modalfoot"><button class="bgt-btn" data-action="sync-backup" id="syncBackup" title="This device\u2019s copy as it was just before the last merge">Pre-merge backup</button>'
+  +     '<button class="bgt-btn" data-action="sync-forget">Forget token</button>'
   +     '<button class="bgt-btn" data-action="sync-close">Cancel</button>'
   +     '<button class="bgt-btn" data-action="sync-save">Save</button></div>'
-  + '</div></div>'
-  + '<div class="bgt-modal" id="conflictWrap"><div class="bgt-modalbox">'
-  +   '<h3>Two copies have diverged</h3><div id="conflictBody"></div>'
-  +   '<div class="bgt-modalfoot"><button class="bgt-btn" data-action="cf-cancel">Cancel</button></div>'
   + '</div></div>';
 }
 function cardShell(cat){
@@ -1024,7 +1016,7 @@ async function readSharedExpensesFromXlsx(file, monthKey){
    localStorage is the working copy; the file is the exchange medium.
 
    Three storage keys, deliberately kept apart:
-     budget:m:*     the data itself   (this is what travels)
+     budget:m:*     the data itself   (this travels, with the currency, split rules and retirement %)
      budget:sync    repo config + rev bookkeeping   (never travels)
      budget:token   the access token  (never travels, never exported)
    ============================================================ */
@@ -1034,7 +1026,7 @@ var SYNC_KEY = "budget:sync", TOKEN_KEY = "budget:token";
 function loadSyncCfg(){
   var d = { owner:"", repo:"", path:"budget-data.json", sharedPath:"expenses.json", branch:"main",
             people:[], meId:"",
-            rev:0, baseRev:0, modified:"", device:"", auto:false };
+            rev:0, baseRev:0, modified:"", device:"", autoSync:true, lastSync:"" };
   try {
     var s = JSON.parse(lsGet(SYNC_KEY) || "{}");
     for(var k in s) d[k] = s[k];
@@ -1071,8 +1063,8 @@ function buildPayload(){
   return {
     app:"monthly-budget", version:1,
     exportedAt:new Date().toISOString(),
-    currency:state.currency,
-    months:months,
+    currency:state.currency, currencyAt:lsGet("budget:currencyAt") || "",
+    months:months, splits:loadSplits(), retirement:loadRet(),
     sync:{ rev:c.rev || 0, modified:c.modified || new Date().toISOString(), device:c.device }
   };
 }
@@ -1114,6 +1106,8 @@ function ghContentsUrl(c){
        + c.path.split("/").map(encodeURIComponent).join("/");
 }
 
+function ghFail(status, body){ var e = new Error(ghError(status, body)); e.status = status; return e; }
+
 /* Map status codes to something a person can act on. */
 function ghError(status, body){
   if(status === 401) return "Token rejected — it may be expired, revoked, or mistyped.";
@@ -1121,7 +1115,7 @@ function ghError(status, body){
     if(/rate limit/i.test(body||"")) return "GitHub rate limit reached. Wait a minute and try again.";
     return "Token lacks permission. It needs Contents: Read and write on this repository.";
   }
-  if(status === 409) return "Someone else wrote to this file while we were saving. Pull the latest copy, then push again.";
+  if(status === 409) return "Another device wrote to this file while we were saving. Sync again to merge.";
   if(status === 422){
     var detail = "";
     try { detail = JSON.parse(body || "{}").message || ""; } catch(e){ detail = (body||"").slice(0,160); }
@@ -1167,11 +1161,11 @@ async function ghRead(c){
       }
       return { missing:true };
     }
-    if(probe.status === 401) throw new Error(ghError(401));
+    if(probe.status === 401) throw ghFail(401);
     throw new Error("Can't see " + c.owner + "/" + c.repo
                     + " — check the names, or the token has no access to it.");
   }
-  if(!res.ok) throw new Error(ghError(res.status, await res.text()));
+  if(!res.ok) throw ghFail(res.status, await res.text());
 
   var j = await res.json();
   var payload;
@@ -1195,30 +1189,119 @@ async function ghWrite(c, payload, sha, message){
     method:"PUT", headers:ghHeaders(), body:JSON.stringify(body)
   });
 
-  /* We believed the file was absent, but GitHub says otherwise. Rather than
-     report a confusing conflict, re-read to pick up the real sha and update. */
+  /* We believed the file was absent, but GitHub says otherwise: another device
+     created it first. Report it as a lost race so the caller reads and merges. */
   if(!res.ok && !sha && (res.status === 422 || res.status === 409)){
     var recheck = null;
     try { recheck = await ghRead(c); } catch(e){ recheck = null; }
-    if(recheck && !recheck.missing && recheck.sha){
-      body.sha = recheck.sha;
-      res = await fetch(ghContentsUrl(c), {
-        method:"PUT", headers:ghHeaders(), body:JSON.stringify(body)
-      });
-    }
+    if(recheck && !recheck.missing) throw ghFail(409);
   }
-  if(!res.ok) throw new Error(ghError(res.status, await res.text()));
+  if(!res.ok) throw ghFail(res.status, await res.text());
   return await res.json();
 }
 
-/* ---- the four-way decision ---- */
-function compareRevs(remoteRev, cfg){
-  var base = cfg.baseRev || 0, local = cfg.rev || 0;
-  var pending = local > base;
-  if(remoteRev > base && pending)  return "conflict";
-  if(remoteRev > base && !pending) return "adopt-remote";
-  if(remoteRev <= base && pending) return "push-needed";
-  return "up-to-date";
+/* ---- what changed, and when ----
+   Every save stamps what it changed, so two devices' edits can be merged line by
+   line instead of one whole copy replacing the other:
+     item.at            when that line last changed
+     month._del[id]     when a line was removed
+     month._rat[acct]   when a rollover balance changed
+   Untouched seed rows carry no stamp, so a fresh browser's placeholders never
+   travel into a month the repo already has. */
+var CATS = ["income","fixed","variable","shared","savings"];
+function nowIso(){ return new Date().toISOString(); }
+function newer(a, b){ return (a || "") > (b || ""); }
+function itemKey(i){
+  return Object.keys(i).filter(function(k){ return k !== "at"; }).sort()
+    .map(function(k){ return k + "=" + JSON.stringify(i[k]); }).join("|");
+}
+function pristineSeed(i){ return !!i.seed && i.seed === i.name && String(i.amount || "").trim() === ""; }
+
+/* Stamps `next` against `prev` (the stored copy, or null). True when anything changed. */
+function stampMonth(prev, next, now){
+  var p = prev ? normalize(prev) : emptyMonth(), changed = false;
+  next._del = Object.assign({}, p._del || {}, next._del || {});
+  next._rat = Object.assign({}, p._rat || {}, next._rat || {});
+  var old = {}, seen = {};
+  CATS.forEach(function(cat){ (p[cat] || []).forEach(function(i){ old[i.id] = i; }); });
+  CATS.forEach(function(cat){
+    (next[cat] || []).forEach(function(i){
+      seen[i.id] = true;
+      var o = old[i.id];
+      if(o && itemKey(o) === itemKey(i)){ if(o.at) i.at = o.at; else delete i.at; return; }
+      if(pristineSeed(i)) return;
+      i.at = now; delete next._del[i.id]; changed = true;
+    });
+  });
+  Object.keys(old).forEach(function(id){ if(!seen[id]){ next._del[id] = now; changed = true; } });
+  var pr = rolloverObj(p), nr = rolloverObj(next);
+  Object.keys(Object.assign({}, pr, nr)).forEach(function(a){
+    if(String(pr[a] == null ? "" : pr[a]) !== String(nr[a] == null ? "" : nr[a])){ next._rat[a] = now; changed = true; }
+  });
+  return changed;
+}
+function hasStamps(m){
+  if(Object.keys(m._del || {}).length || Object.keys(m._rat || {}).length) return true;
+  return CATS.some(function(cat){ return (m[cat] || []).some(function(i){ return !!i.at; }); });
+}
+
+/* Newest version of each line wins (a tie goes to the repo). A removal sticks unless the
+   line was edited after it. Unstamped lines only this device has are untouched seeds. */
+function mergeMonth(L, R){
+  var out = normalize(R), del = Object.assign({}, R._del || {});
+  Object.keys(L._del || {}).forEach(function(id){ if(newer(L._del[id], del[id])) del[id] = L._del[id]; });
+  CATS.forEach(function(cat){
+    var lById = {}, rIds = {}, list = [];
+    (L[cat] || []).forEach(function(i){ lById[i.id] = i; });
+    (R[cat] || []).forEach(function(r){
+      rIds[r.id] = true;
+      var l = lById[r.id];
+      list.push(l && newer(l.at, r.at) ? l : r);
+    });
+    (L[cat] || []).forEach(function(l){ if(!rIds[l.id] && l.at) list.push(l); });
+    out[cat] = list.filter(function(i){
+      if(del[i.id] && !newer(i.at, del[i.id])) return false;
+      delete del[i.id];
+      return true;
+    }).map(function(i){ var o = {}; for(var k in i) o[k] = i[k]; return o; });
+  });
+  var lr = rolloverObj(L), rat = Object.assign({}, R._rat || {});
+  Object.keys(L._rat || {}).forEach(function(a){
+    if(newer(L._rat[a], rat[a])){ rat[a] = L._rat[a]; out.rollover[a] = lr[a] == null ? "" : lr[a]; }
+  });
+  out._del = del; out._rat = rat;
+  out._sv = Math.max(L._sv || 0, R._sv || 0) || undefined;
+  return out;
+}
+
+function mergePayload(L, R){
+  var months = {}, lm = L.months || {}, rm = R.months || {};
+  Object.keys(rm).forEach(function(k){ months[k] = lm[k] ? mergeMonth(lm[k], rm[k]) : rm[k]; });
+  Object.keys(lm).forEach(function(k){ if(!rm[k] && hasStamps(lm[k])) months[k] = lm[k]; });
+  var splits = {}, ls = L.splits || {}, rs = R.splits || {};
+  Object.keys(rs).forEach(function(n){ splits[n] = rs[n]; });
+  Object.keys(ls).forEach(function(n){ if(!rs[n] || newer(ls[n].at, rs[n].at)) splits[n] = ls[n]; });
+  var lc = newer(L.currencyAt, R.currencyAt) || !R.currency;
+  var lret = !R.retirement || (L.retirement && newer(L.retirement.at, R.retirement.at));
+  return { app:"monthly-budget", version:1, exportedAt:nowIso(),
+           currency:lc ? L.currency : R.currency, currencyAt:lc ? L.currencyAt : R.currencyAt,
+           months:months, splits:splits, retirement:lret ? L.retirement : R.retirement };
+}
+
+/* Data from before stamping existed: a device with unpushed edits stamps all its lines once,
+   so those edits aren't mistaken for untouched seeds on its first merge. */
+function migrateStamps(){
+  var c = loadSyncCfg();
+  if(c.stamped) return;
+  if(hasLocalEdits()){
+    var now = nowIso();
+    allMonthKeys().forEach(function(k){
+      var m = loadMonthRaw(k); if(!m) return;
+      CATS.forEach(function(cat){ (m[cat] || []).forEach(function(i){ if(!i.at && !pristineSeed(i)) i.at = now; }); });
+      saveMonth(k, m);
+    });
+  }
+  c = loadSyncCfg(); c.stamped = true; saveSyncCfg(c);
 }
 
 function applyPayload(p){
@@ -1227,6 +1310,9 @@ function applyPayload(p){
     try { lsSet("budget:m:"+k, JSON.stringify(p.months[k])); } catch(e){}
   });
   if(p.currency){ state.currency = p.currency; saveCurrency(state.currency); fmtCache = {}; }
+  if(p.currencyAt) lsSet("budget:currencyAt", p.currencyAt);
+  if(p.splits) lsSet("budget:splits", JSON.stringify(p.splits));
+  if(p.retirement) lsSet(RET_KEY, JSON.stringify(p.retirement));
   var keys = Object.keys(p.months || {});
   if(keys.indexOf(state.monthKey) < 0 && keys.length){ keys.sort(); state.monthKey = keys[keys.length-1]; }
   state.data = getMonth(state.monthKey);
@@ -1235,6 +1321,7 @@ function applyPayload(p){
   renderLines(); updateDerived();
 }
 
+function syncConfigured(c){ return !!(c.owner && c.repo && c.path && getToken()); }
 function requireConfig(){
   var c = loadSyncCfg();
   if(!c.owner || !c.repo || !c.path){ openSyncPanel(); setStatus("Set the repo first"); return null; }
@@ -1242,157 +1329,103 @@ function requireConfig(){
   return c;
 }
 
-/* ---- only one sync operation at a time ----
-   Auto-push and a manual click can otherwise overlap: both read a sha, the
-   first write invalidates it, and the second fails as a false conflict. */
-var syncBusy = false;
-function beginSync(){
-  if(syncBusy){ setStatus("Sync already running\u2026"); return false; }
-  syncBusy = true; return true;
+/* ---- sync: read, merge if both sides moved, push ----
+   Only one runs at a time: overlapping runs would both read a sha, and the second
+   write would fail. A write that loses the race to another device (409) re-reads,
+   merges and tries again. */
+var syncBusy = false, syncErr = "";
+var BACKUP_KEY = "budget:premerge";
+async function runSync(auto){
+  if(syncBusy){ if(!auto) setStatus("Sync already running…"); return; }
+  if(auto ? !syncConfigured(loadSyncCfg()) : !requireConfig()) return;
+  syncBusy = true;
+  try { await syncOnce(auto); } finally { syncBusy = false; }
+  if(autoOn() && hasLocalEdits() && !syncErr) scheduleAutoPush();   /* edits made while it ran */
 }
-function endSync(){ syncBusy = false; }
-
-async function syncPull(force){
-  if(!beginSync()) return;
-  try { return await syncPullInner(force); } finally { endSync(); }
-}
-async function syncPush(force){
-  if(!beginSync()) return;
-  try { return await syncPushInner(force); } finally { endSync(); }
-}
-async function resolveConflict(keep){
-  if(!beginSync()) return;
-  try { return await resolveConflictInner(keep); } finally { endSync(); }
-}
-
-/* ---- pull ---- */
-async function syncPullInner(force){
-  var c = requireConfig(); if(!c) return;
-  setStatus("Checking…");
-  var r;
-  try { r = await ghRead(c); }
-  catch(e){ setStatus("Sync failed"); alert(e.message); return; }
-
-  if(r.missing){ setStatus("Nothing saved in that repo yet — push first."); return; }
-
-  var remoteRev = (r.payload.sync && r.payload.sync.rev) || 0;
-  var verdict = force ? "adopt-remote" : compareRevs(remoteRev, c);
-
-  if(verdict === "conflict"){ showConflict(r.payload, r.sha, "pull"); return; }
-  if(verdict === "push-needed"){ setStatus("This copy is ahead — push instead."); return; }
-  if(verdict === "up-to-date"){ setStatus("Already up to date"); return; }
-
-  applyPayload(r.payload);
-  c.rev = remoteRev; c.baseRev = remoteRev;
-  c.modified = (r.payload.sync && r.payload.sync.modified) || new Date().toISOString();
-  saveSyncCfg(c);
-  setStatus("Pulled " + describePayload(r.payload));
-}
-
-/* ---- push ---- */
-async function syncPushInner(force){
-  var c = requireConfig(); if(!c) return;
-  saveNow();
-  setStatus("Checking…");
-  var r;
-  try { r = await ghRead(c); }
-  catch(e){ setStatus("Sync failed"); alert(e.message); return; }
-
-  var sha = r.missing ? null : r.sha;
-  if(!r.missing && !force){
-    var remoteRev = (r.payload.sync && r.payload.sync.rev) || 0;
-    var verdict = compareRevs(remoteRev, c);
-    if(verdict === "conflict"){ showConflict(r.payload, r.sha, "push"); return; }
-    if(verdict === "adopt-remote"){ setStatus("Remote is newer — pull first."); return; }
-    if(verdict === "up-to-date"){ setStatus("Nothing to push"); return; }
+async function syncOnce(auto){
+  if(!auto) setStatus("Syncing…");
+  for(var attempt = 0; attempt < 3; attempt++){
+    flushSave();
+    var c = loadSyncCfg(), startRev = c.rev || 0, r;
+    try { r = await ghRead(c); } catch(e){ return syncFailed(e, auto); }
+    flushSave();
+    c = loadSyncCfg();
+    if((c.rev || 0) !== startRev) continue;   /* edited while reading: read again */
+    var pending = (c.rev || 0) > (c.baseRev || 0);
+    var remoteRev = r.missing ? 0 : ((r.payload.sync && r.payload.sync.rev) || 0);
+    try {
+      if(r.missing){
+        if(!pending && auto) return syncDone("Nothing in the repo yet");
+        await pushNow(c, null);
+        return syncDone("Pushed " + describePayload(buildPayload()));
+      }
+      if(remoteRev > (c.baseRev || 0)){
+        if(!pending){
+          applyPayload(r.payload);
+          c = loadSyncCfg(); c.rev = c.baseRev = remoteRev;
+          c.modified = (r.payload.sync && r.payload.sync.modified) || nowIso();
+          saveSyncCfg(c);
+          return syncDone(auto ? "Synced " + fmtTime(nowIso()) : "Pulled " + describePayload(r.payload));
+        }
+        var mine = buildPayload();
+        lsSet(BACKUP_KEY, JSON.stringify(mine));   /* this device's copy as it was, just in case */
+        applyPayload(mergePayload(mine, r.payload));
+        c = loadSyncCfg(); c.rev = Math.max(c.rev || 0, remoteRev) + 1; c.modified = nowIso(); saveSyncCfg(c);
+        await pushNow(c, r.sha);
+        return syncDone("Merged with the repo's changes and pushed");
+      }
+      if(pending){ await pushNow(c, r.sha); return syncDone(auto ? "Synced " + fmtTime(nowIso()) : "Pushed " + describePayload(buildPayload())); }
+      return syncDone(auto ? "Synced " + fmtTime(nowIso()) : "Already up to date");
+    } catch(e){
+      if(e.status === 409 && attempt < 2) continue;
+      return syncFailed(e, auto);
+    }
   }
-
-  var payload = buildPayload();
-  setStatus("Pushing…");
-  try { await ghWrite(c, payload, sha); }
-  catch(e){ setStatus("Push failed"); alert(e.message); return; }
-
-  var c2 = loadSyncCfg();
-  c2.baseRev = payload.sync.rev;
-  c2.modified = payload.sync.modified;
-  saveSyncCfg(c2);
-  setStatus("Pushed " + describePayload(payload));
+  if(!auto) setStatus("Still editing \u2014 will sync shortly");
 }
-
-/* ---- conflict: block the write, show both, back up the loser ---- */
-var pendingConflict = null;
-function showConflict(remotePayload, sha, origin){
-  pendingConflict = { remote:remotePayload, sha:sha, origin:origin };
-  var c = loadSyncCfg();
-  var mine = buildPayload();
-  var rs = remotePayload.sync || {};
-  var el = $("#conflictBody");
-  el.innerHTML =
-      '<p class="bgt-ordersub">Both copies changed since they last matched. Nothing has been'
-    + ' overwritten. Choose which to keep — the other is downloaded as a backup first.</p>'
-    + '<div class="bgt-cflist">'
-    +   '<div class="bgt-cfcard"><h4>This device</h4>'
-    +     '<div class="bgt-cfmeta">' + esc(c.device) + '</div>'
-    +     '<div class="bgt-cfmeta">' + esc(fmtWhen(mine.sync.modified)) + '</div>'
-    +     '<div class="bgt-cfmeta">rev ' + mine.sync.rev + '</div>'
-    +     '<div class="bgt-cfsum">' + esc(describePayload(mine)) + '</div>'
-    +     '<button class="bgt-btn" data-action="cf-mine">Keep this device’s copy</button></div>'
-    +   '<div class="bgt-cfcard"><h4>In the repo</h4>'
-    +     '<div class="bgt-cfmeta">' + esc(rs.device || "unknown device") + '</div>'
-    +     '<div class="bgt-cfmeta">' + esc(fmtWhen(rs.modified)) + '</div>'
-    +     '<div class="bgt-cfmeta">rev ' + (rs.rev || 0) + '</div>'
-    +     '<div class="bgt-cfsum">' + esc(describePayload(remotePayload)) + '</div>'
-    +     '<button class="bgt-btn" data-action="cf-remote">Keep the repo’s copy</button></div>'
-    + '</div>';
-  $("#conflictWrap").style.display = "flex";
-  setStatus("Conflict — nothing overwritten");
+async function pushNow(c, sha){
+  var payload = buildPayload();
+  await ghWrite(c, payload, sha, "budget: rev " + payload.sync.rev + " from " + c.device);
+  var c2 = loadSyncCfg(); c2.baseRev = payload.sync.rev; saveSyncCfg(c2);
+}
+function syncDone(msg){
+  syncErr = "";
+  var c = loadSyncCfg(); c.lastSync = nowIso(); saveSyncCfg(c);
+  setStatus(msg); refreshSyncState();
+}
+function syncFailed(e, auto){
+  var offline = e instanceof TypeError;   /* fetch itself failed: no connection */
+  syncErr = offline ? "offline" : e.message;
+  setStatus(offline ? "Offline — will retry" : "Sync problem — see Sync…");
+  refreshSyncState();
+  if(!auto) alert(e.message);
 }
 function fmtWhen(iso){
   if(!iso) return "unknown time";
   try { return new Date(iso).toLocaleString(); } catch(e){ return iso; }
 }
-function closeConflict(){ $("#conflictWrap").style.display = "none"; pendingConflict = null; }
+function fmtTime(iso){
+  try { return new Date(iso).toLocaleTimeString([], { hour:"numeric", minute:"2-digit" }); } catch(e){ return ""; }
+}
+function downloadBackup(){
+  var b = lsGet(BACKUP_KEY); if(!b) return;
+  download("budget-premerge-" + nowIso().slice(0,10) + ".json", b);
+}
 
-async function resolveConflictInner(keep){
-  if(!pendingConflict) return;
-  var pc = pendingConflict, c = loadSyncCfg();
-  var stamp = new Date().toISOString().slice(0,10);
-  if(keep === "mine"){
-    /* The dialog may have been open a while. Re-read so the write carries a
-       current sha, and if the other side moved on again, show that new copy
-       instead of failing with a conflict the user cannot act on. */
-    var fresh;
-    setStatus("Checking…");
-    try { fresh = await ghReadPath(c, c.path); }
-    catch(e){ setStatus("Push failed"); alert(e.message); return; }
-
-    if(!fresh.missing){
-      var freshRev = (fresh.payload.sync && fresh.payload.sync.rev) || 0;
-      var shownRev = (pc.remote.sync && pc.remote.sync.rev) || 0;
-      if(fresh.sha !== pc.sha && freshRev !== shownRev){
-        closeConflict();
-        showConflict(fresh.payload, fresh.sha, pc.origin);
-        alert("The copy in the repository changed again while this dialog was open.\n\n"
-              + "Shown here as it stands now — nothing has been overwritten.");
-        return;
-      }
-    }
-    download("budget-backup-repo-" + stamp + ".json", JSON.stringify(pc.remote, null, 2));
-    var payload = buildPayload();
-    setStatus("Pushing…");
-    try { await ghWrite(c, payload, fresh.missing ? null : fresh.sha,
-                        "budget: resolve conflict, keep " + c.device); }
-    catch(e){ setStatus("Push failed"); alert(e.message); return; }
-    var c2 = loadSyncCfg(); c2.baseRev = payload.sync.rev; saveSyncCfg(c2);
-    setStatus("Kept this device’s copy");
-  } else {
-    download("budget-backup-local-" + stamp + ".json", JSON.stringify(buildPayload(), null, 2));
-    applyPayload(pc.remote);
-    var rr = (pc.remote.sync && pc.remote.sync.rev) || 0;
-    var c3 = loadSyncCfg(); c3.rev = rr; c3.baseRev = rr; saveSyncCfg(c3);
-    setStatus("Kept the repo’s copy");
-  }
-  closeConflict();
+/* ---- automatic sync ----
+   Pull when the app opens, every 30 seconds while on screen, on focus and when back
+   online; push 10 seconds after the last edit and when the app is put away. */
+function autoOn(){ var c = loadSyncCfg(); return c.autoSync !== false && syncConfigured(c); }
+var autoTimer = null;
+function scheduleAutoPush(){ if(!autoOn()) return; clearTimeout(autoTimer); autoTimer = setTimeout(autoSync, 10000); }
+function typing(){
+  var a = document.activeElement;
+  return !!(a && a.dataset && (a.dataset.field || a.dataset.acct !== undefined || a.dataset.ret));
+}
+function autoSync(){
+  if(!autoOn() || document.visibilityState === "hidden") return;
+  if(typing()){ clearTimeout(autoTimer); autoTimer = setTimeout(autoSync, 5000); return; }   /* don't redraw under the cursor */
+  runSync(true);
 }
 
 /* ---- settings panel ---- */
@@ -1410,12 +1443,20 @@ function openSyncPanel(){
     ? ppl.map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===c.meId?" selected":"")+'>'+esc(p.name||p.id)+'</option>'; }).join("")
     : '<option value="">(load shared expenses once)</option>';
   $("#syncToken").value  = getToken();
-  $("#syncAuto").checked = !!c.auto;
+  $("#syncAuto").checked = c.autoSync !== false;
   $("#syncWarn").style.display = onSharedPagesOrigin() ? "" : "none";
-  $("#syncState").textContent =
-      "rev " + (c.rev||0) + " here, last exchanged at rev " + (c.baseRev||0)
-    + (hasLocalEdits() ? " — unpushed changes" : " — nothing pending");
+  refreshSyncState();
   $("#syncWrap").style.display = "flex";
+}
+function refreshSyncState(){
+  var el = $("#syncState"); if(!el) return;
+  var c = loadSyncCfg();
+  el.textContent =
+      "rev " + (c.rev||0) + " here, last exchanged at rev " + (c.baseRev||0)
+    + (hasLocalEdits() ? " — unpushed changes" : " — nothing pending")
+    + (c.lastSync ? " · last synced " + fmtWhen(c.lastSync) : "")
+    + (syncErr && syncErr !== "offline" ? "\nLast problem: " + syncErr : syncErr ? "\nOffline — will retry" : "");
+  $("#syncBackup").style.display = lsGet(BACKUP_KEY) ? "" : "none";
 }
 function closeSyncPanel(){ $("#syncWrap").style.display = "none"; }
 function saveSyncPanel(){
@@ -1426,14 +1467,15 @@ function saveSyncPanel(){
   c.branch = $("#syncBranch").value.trim() || "main";
   c.sharedPath = $("#syncShared").value.trim() || "expenses.json";
   var meVal = $("#syncMe").value; if(meVal) c.meId = meVal;
-  c.auto   = $("#syncAuto").checked;
+  c.autoSync = $("#syncAuto").checked;
   saveSyncCfg(c);
   setToken($("#syncToken").value.trim());
   closeSyncPanel();
   setStatus("Sync settings saved");
+  if(autoOn()) runSync(true);
 }
 function forgetToken(){
-  setToken("");
+  setToken(""); clearTimeout(autoTimer);
   $("#syncToken").value = "";
   setStatus("Token removed from this browser");
 }
@@ -1444,30 +1486,23 @@ function setStatus(s){ var e = $("#saveStatus"); if(e) e.textContent = s; }
 function scheduleSave(){
   setStatus("Saving\u2026");
   if(saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(function(){ flushSave(); maybeAutoPush(); }, 400);
+  saveTimer = setTimeout(flushSave, 400);
 }
 function saveNow(){ flushSave(); }
 
 /* A debounced save is lost if the tab closes inside the debounce window,
    so this path is also called on the way out. */
 function flushSave(){
+  var wasPending = !!saveTimer;
   if(saveTimer){ clearTimeout(saveTimer); saveTimer = null; }
-  /* Advance the revision only when the stored bytes actually change.
-     Saving is called on many paths (including before a push), and a rev
+  /* Stamp what changed and advance the revision only when something did.
+     Saving is called on many paths (including before every sync), and a rev
      that moves without an edit would make this copy look permanently
      ahead of the repo. */
-  var before = lsGet("budget:m:" + state.monthKey);
+  var changed = stampMonth(loadMonthRaw(state.monthKey), state.data, new Date().toISOString());
   saveMonth(state.monthKey, state.data);
-  var after = lsGet("budget:m:" + state.monthKey);
-  if(before !== after) bumpRev();
-  setStatus("All changes saved");
-}
-var autoPushTimer = null;
-function maybeAutoPush(){
-  var c = loadSyncCfg();
-  if(!c.auto || !c.owner || !c.repo || !getToken()) return;
-  if(autoPushTimer) clearTimeout(autoPushTimer);
-  autoPushTimer = setTimeout(function(){ if(!syncBusy) syncPush(); }, 2500);
+  if(changed){ bumpRev(); scheduleAutoPush(); }
+  if(wasPending || changed) setStatus("All changes saved");
 }
 
 function findItem(cat, id){ var a = state.data[cat]; for(var i=0;i<a.length;i++){ if(a[i].id===id) return a[i]; } return null; }
@@ -1489,8 +1524,9 @@ function loadSplits(){
 function saveSplit(name, pct, extra){
   if(!name) return;
   var m = loadSplits();
-  m[name] = { pct:String(pct == null ? "50" : pct), extra:String(extra || "") };
+  m[name] = { pct:String(pct == null ? "50" : pct), extra:String(extra || ""), at:new Date().toISOString() };
   lsSet("budget:splits", JSON.stringify(m));
+  bumpRev();
 }
 function splitSettingsFor(name){
   /* An explicitly saved rule wins. It is only written when you edit a line's
@@ -1669,9 +1705,19 @@ function exportData(){
 }
 function importData(obj){
   if(!obj || typeof obj!=="object" || !obj.months){ alert("That doesn't look like a budget export file."); return; }
-  if(!window.confirm("Importing will replace the budget data stored in this browser. Continue?")) return;
-  allMonthKeys().forEach(function(k){ lsDel("budget:m:"+k); });
-  Object.keys(obj.months).forEach(function(k){ try { lsSet("budget:m:"+k, JSON.stringify(obj.months[k])); } catch(e){} });
+  if(!window.confirm("Importing will replace the budget data stored in this browser"
+                     + (autoOn() ? " and, on the next sync, in the repo" : "") + ". Continue?")) return;
+  /* Stamped against what was here, so the replacement syncs as edits: lines that aren't in
+     the file are recorded as removed rather than coming back from the repo on the next merge. */
+  var now = new Date().toISOString(), changed = false, keys0 = allMonthKeys();
+  keys0.concat(Object.keys(obj.months)).forEach(function(k){
+    var prev = loadMonthRaw(k);
+    var next = normalize(obj.months[k] || { _del:prev && prev._del, _rat:prev && prev._rat });
+    if(stampMonth(prev, next, now)) changed = true;
+    saveMonth(k, next);
+  });
+  if(obj.currency && obj.currency !== state.currency){ lsSet("budget:currencyAt", now); changed = true; }
+  if(changed){ bumpRev(); scheduleAutoPush(); }
   if(obj.currency){ state.currency = obj.currency; saveCurrency(state.currency); fmtCache = {}; }
   var keys = Object.keys(obj.months);
   if(keys.indexOf(state.monthKey) < 0 && keys.length){ keys.sort(); state.monthKey = keys[keys.length-1]; }
@@ -1711,8 +1757,7 @@ function wireEvents(){
       }
       scheduleSave(); updateDerived();
     } else if(el.dataset && el.dataset.ret){
-      /* Lives outside the month document, so deliberately no scheduleSave() — editing the
-         percentage must not mark the month dirty for sync. */
+      /* Lives outside the month document, so no scheduleSave(); saveRet() stamps it for sync. */
       var rv = el.value.replace(/[^0-9.]/g,"");
       if(rv !== el.value) el.value = rv;
       var rc = loadRet(); rc.pct = rv; saveRet(rc);
@@ -1737,6 +1782,7 @@ function wireEvents(){
       updateDerived();
     } else if(el.id==="currencySel"){
       state.currency = el.value; saveCurrency(state.currency); fmtCache = {};
+      lsSet("budget:currencyAt", new Date().toISOString()); bumpRev(); scheduleAutoPush();
       renderLines(); updateDerived();
     }
   });
@@ -1758,11 +1804,8 @@ function wireEvents(){
     else if(a==="sync-close"){ closeSyncPanel(); }
     else if(a==="sync-save"){ saveSyncPanel(); }
     else if(a==="sync-forget"){ forgetToken(); }
-    else if(a==="sync-push"){ syncPush(); }
-    else if(a==="sync-pull"){ syncPull(); }
-    else if(a==="cf-mine"){ resolveConflict("mine"); }
-    else if(a==="cf-remote"){ resolveConflict("remote"); }
-    else if(a==="cf-cancel"){ closeConflict(); }
+    else if(a==="sync-now"){ runSync(false); }
+    else if(a==="sync-backup"){ downloadBackup(); }
     else if(a==="export"){ exportData(); }
     else if(a==="import"){ $("#fileInput").click(); }
   });
@@ -1778,6 +1821,7 @@ function wireEvents(){
 /* ------------------------------ init ----------------------------- */
 function init(){
   app = document.getElementById("app");
+  migrateStamps();
   state.currency = loadCurrency() || "USD";
   var realKey = ymKey(new Date());
   state.monthKey = allMonthKeys().length ? realKey : "2026-06";
@@ -1792,8 +1836,15 @@ function init(){
   window.addEventListener("beforeunload", flushSave);
   window.addEventListener("pagehide", flushSave);
   document.addEventListener("visibilitychange", function(){
-    if(document.visibilityState === "hidden") flushSave();
+    if(document.visibilityState === "hidden"){
+      flushSave();
+      if(autoOn() && hasLocalEdits()) runSync(true);   /* push before the app is put away */
+    } else autoSync();
   });
+  window.addEventListener("focus", autoSync);
+  window.addEventListener("online", autoSync);
+  setInterval(autoSync, 30000);
+  autoSync();
 }
 init();
 </script>
