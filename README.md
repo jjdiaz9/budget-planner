@@ -71,15 +71,23 @@ The file has no concept of a fixed amount one person always pays on top of a spl
 
 ### Syncing across machines
 
-**Sync…** stores your budget as a single JSON file in a private GitHub repository. **Push** sends this browser's copy up, **Pull** brings the other machine's copy down.
+**Sync…** stores your budget as a single JSON file in a private GitHub repository, and keeps every device that uses it up to date. **Sync now** does a round by hand.
 
 Settings: repository owner and name, the budget file path, the shared-expenses file path, the branch, and a fine-grained access token scoped to that one repository with **Contents: Read and write**.
 
 Three things are kept in separate browser storage keys and never mixed: the budget data (the only thing that travels), the repo configuration, and the token. An exported or synced file therefore cannot carry a credential, and a leaked data file reveals nothing about where it came from.
 
-**Conflicts are never resolved silently.** If both machines changed since they last matched, the write is blocked and you're shown both copies — device, timestamp and a summary of contents. Whichever you discard is downloaded as a backup first. There is no last-write-wins.
+**Automatic sync** is on by default once a token is saved (it can be turned off in the Sync panel). Each device pulls when the app opens, every 30 seconds while it's on screen, when you come back to it and when it's back online, and pushes about 10 seconds after you stop editing and when the app is put away. Pulls wait while you're typing in a field. Each push is a commit in the repo.
 
-Auto-push is available but **off by default**: each push is a commit, and enabling it turns the repo history into noise.
+**Changes from different devices are merged, line by line.** Every save stamps what changed: each line, each rollover balance, each removed line, the currency, each split rule and the retirement %. When both devices changed things since they last matched:
+
+- edits to different lines are all kept, and lines added on either device are kept;
+- if the same line was edited on both, the later edit wins;
+- a removed line stays removed unless it was edited on the other device after the removal.
+
+A push that loses the race to another device re-reads, merges and tries again. Before each merge, this device's copy is saved in the browser; **Pre-merge backup** in the Sync panel downloads it.
+
+Split rules and the retirement % travel in the synced file too, so they only need setting once. **Load** replaces the data on every synced device: lines not in the loaded file are recorded as removed.
 
 > **A note on tokens and GitHub Pages.** All `username.github.io` project sites share a single browser origin, because same-origin policy keys on host rather than path. A token stored while using the hosted copy is readable by any other Pages site published under the same account. The app warns about this on-screen. If that matters to you, open a local copy of `budget.html` when syncing.
 
